@@ -228,16 +228,6 @@ function Timesheet() {
                       placeholder="z. B. HU FED RADEV HU"
                     />
                   </td>
-                  <td className="no-print px-2 py-1.5">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Zeile löschen"
-                      onClick={() => removeRow(entry.id)}
-                    >
-                      <Trash2 />
-                    </Button>
-                  </td>
                 </tr>
               );
             })}
