@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Download, Printer, RotateCcw } from "lucide-react";
+import { Download, Printer, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,13 +8,15 @@ import { Label } from "@/components/ui/label";
 import {
   type Entry,
   type Settings,
+  buildMonthEntries,
   calcTotals,
-  createEntry,
+  dayLabel,
   defaultSettings,
   entryHours,
   formatEuro,
   formatHours,
   formatMonth,
+  isWeekend,
   toCsv,
 } from "@/lib/timesheet";
 
@@ -48,18 +50,20 @@ function Timesheet() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    let next = defaultSettings;
+    let stored: Entry[] = [];
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as { settings: Settings; entries: Entry[] };
-        setSettings({ ...defaultSettings, ...parsed.settings });
-        setEntries(parsed.entries?.length ? parsed.entries : [createEntry()]);
-      } else {
-        setEntries([createEntry()]);
+        next = { ...defaultSettings, ...parsed.settings };
+        stored = parsed.entries ?? [];
       }
     } catch {
-      setEntries([createEntry()]);
+      /* ignore */
     }
+    setSettings(next);
+    setEntries(buildMonthEntries(next.month, stored));
     setLoaded(true);
   }, []);
 
@@ -68,19 +72,20 @@ function Timesheet() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, entries }));
   }, [settings, entries, loaded]);
 
+  const setMonth = (month: string) => {
+    setSettings((prev) => ({ ...prev, month }));
+    setEntries((prev) => buildMonthEntries(month, prev));
+  };
+
   const totals = useMemo(() => calcTotals(entries, settings), [entries, settings]);
   const overCap = totals.totalHours > settings.capHours;
 
   const update = (id: string, patch: Partial<Entry>) =>
     setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
 
-  const addRow = () => setEntries((prev) => [...prev, createEntry()]);
-  const removeRow = (id: string) =>
-    setEntries((prev) => (prev.length > 1 ? prev.filter((e) => e.id !== id) : prev));
-
   const resetMonth = () => {
     if (!confirm("Alle Einträge dieses Monats löschen?")) return;
-    setEntries([createEntry()]);
+    setEntries(buildMonthEntries(settings.month));
   };
 
   const exportCsv = () => {
@@ -135,7 +140,7 @@ function Timesheet() {
           <Input
             type="month"
             value={settings.month}
-            onChange={(e) => setSettings({ ...settings, month: e.target.value })}
+            onChange={(e) => setMonth(e.target.value)}
           />
         </Field>
         <Field label="Basis-Satz (€/Std.)">
@@ -168,7 +173,7 @@ function Timesheet() {
         <table className="w-full min-w-[860px] border-collapse text-sm">
           <thead>
             <tr className="bg-primary text-primary-foreground">
-              {["Datum", "Beginn", "Ende", "Pause (Min)", "Arbeitszeit", "Tour / Bemerkung", ""].map(
+              {["Tag", "Beginn", "Ende", "Pause (Min)", "Arbeitszeit", "Tour / Bemerkung"].map(
                 (h) => (
                   <th
                     key={h}
@@ -183,14 +188,14 @@ function Timesheet() {
           <tbody>
             {entries.map((entry) => {
               const hours = entryHours(entry);
+              const weekend = isWeekend(entry.date);
               return (
-                <tr key={entry.id} className="border-t border-border even:bg-muted/40">
-                  <td className="px-2 py-1.5">
-                    <CellInput
-                      type="date"
-                      value={entry.date}
-                      onChange={(v) => update(entry.id, { date: v })}
-                    />
+                <tr
+                  key={entry.id}
+                  className={`border-t border-border ${weekend ? "bg-muted/70" : "even:bg-muted/40"}`}
+                >
+                  <td className="tabular whitespace-nowrap px-3 py-1.5 font-medium">
+                    {dayLabel(entry.date)}
                   </td>
                   <td className="px-2 py-1.5">
                     <CellInput
@@ -223,16 +228,6 @@ function Timesheet() {
                       placeholder="z. B. HU FED RADEV HU"
                     />
                   </td>
-                  <td className="no-print px-2 py-1.5">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Zeile löschen"
-                      onClick={() => removeRow(entry.id)}
-                    >
-                      <Trash2 />
-                    </Button>
-                  </td>
                 </tr>
               );
             })}
@@ -245,7 +240,7 @@ function Timesheet() {
               <td className="tabular px-3 py-3 text-right text-base font-bold">
                 {formatHours(totals.totalHours)}
               </td>
-              <td colSpan={2} className="px-3 py-3 text-sm">
+              <td className="px-3 py-3 text-sm">
                 {overCap ? (
                   <span className="font-medium text-warning-foreground">
                     {formatHours(totals.overtimeHours)} Std. über der Grenze
@@ -261,11 +256,6 @@ function Timesheet() {
         </table>
       </section>
 
-      <div className="no-print mt-3">
-        <Button variant="outline" size="sm" onClick={addRow}>
-          <Plus /> Tag hinzufügen
-        </Button>
-      </div>
 
       <section className="mt-8 grid gap-4 md:grid-cols-3">
         <SummaryCard

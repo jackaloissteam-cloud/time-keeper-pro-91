@@ -119,3 +119,33 @@ export function toCsv(entries: Entry[], settings: Settings, totals: Totals): str
     .map((r) => r.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(";"))
     .join("\n");
 }
+
+export function daysInMonth(month: string): number {
+  const [y, m] = month.split("-").map(Number);
+  if (!y || !m) return 31;
+  return new Date(y, m, 0).getDate();
+}
+
+/** Erzeugt für jeden Tag des Monats eine Zeile; vorhandene Einträge bleiben erhalten. */
+export function buildMonthEntries(month: string, existing: Entry[] = []): Entry[] {
+  const byDate = new Map(existing.map((e) => [e.date, e]));
+  const count = daysInMonth(month);
+  return Array.from({ length: count }, (_, i) => {
+    const date = `${month}-${String(i + 1).padStart(2, "0")}`;
+    return byDate.get(date) ?? createEntry(date);
+  });
+}
+
+export function dayLabel(date: string): string {
+  if (!date) return "";
+  const d = new Date(date + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return date;
+  const wd = d.toLocaleDateString("de-DE", { weekday: "short" });
+  return `${String(d.getDate()).padStart(2, "0")}. ${wd}`;
+}
+
+export function isWeekend(date: string): boolean {
+  const d = new Date(date + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return false;
+  return d.getDay() === 0 || d.getDay() === 6;
+}
