@@ -173,7 +173,7 @@ function Timesheet() {
         <table className="w-full min-w-[860px] border-collapse text-sm">
           <thead>
             <tr className="bg-primary text-primary-foreground">
-              {["Datum", "Beginn", "Ende", "Pause (Min)", "Arbeitszeit", "Tour / Bemerkung", ""].map(
+              {["Tag", "Beginn", "Ende", "Pause (Min)", "Arbeitszeit", "Tour / Bemerkung"].map(
                 (h) => (
                   <th
                     key={h}
@@ -188,14 +188,14 @@ function Timesheet() {
           <tbody>
             {entries.map((entry) => {
               const hours = entryHours(entry);
+              const weekend = isWeekend(entry.date);
               return (
-                <tr key={entry.id} className="border-t border-border even:bg-muted/40">
-                  <td className="px-2 py-1.5">
-                    <CellInput
-                      type="date"
-                      value={entry.date}
-                      onChange={(v) => update(entry.id, { date: v })}
-                    />
+                <tr
+                  key={entry.id}
+                  className={`border-t border-border ${weekend ? "bg-muted/70" : "even:bg-muted/40"}`}
+                >
+                  <td className="tabular whitespace-nowrap px-3 py-1.5 font-medium">
+                    {dayLabel(entry.date)}
                   </td>
                   <td className="px-2 py-1.5">
                     <CellInput
