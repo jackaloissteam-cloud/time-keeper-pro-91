@@ -16,11 +16,11 @@ export type Settings = {
 };
 
 export const defaultSettings: Settings = {
-  employee: "Werner Jedlicsek",
+  employee: "",
   month: new Date().toISOString().slice(0, 7),
   baseRate: 13.9,
   overtimeRate: 12,
-  capHours: 42,
+  capHours: 43,
 };
 
 export function createEntry(date = ""): Entry {
