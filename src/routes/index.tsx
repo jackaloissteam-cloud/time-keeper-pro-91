@@ -140,7 +140,7 @@ function Timesheet() {
           <Input
             type="month"
             value={settings.month}
-            onChange={(e) => setSettings({ ...settings, month: e.target.value })}
+            onChange={(e) => setMonth(e.target.value)}
           />
         </Field>
         <Field label="Basis-Satz (€/Std.)">
