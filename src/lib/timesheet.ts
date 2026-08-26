@@ -37,8 +37,8 @@ export function createEntry(date = ""): Entry {
 /** Arbeitszeit in Stunden; unterstützt Schichten über Mitternacht. */
 export function entryHours(entry: Entry): number | null {
   if (!entry.start || !entry.end) return null;
-  const [sh, sm] = entry.start.split(":").map(Number);
-  const [eh, em] = entry.end.split(":").map(Number);
+  const [sh = NaN, sm = NaN] = entry.start.split(":").map(Number);
+  const [eh = NaN, em = NaN] = entry.end.split(":").map(Number);
   if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return null;
   let minutes = eh * 60 + em - (sh * 60 + sm);
   if (minutes < 0) minutes += 24 * 60;
