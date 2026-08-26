@@ -21,17 +21,17 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Stundenzettel-Rechner mit 42-Stunden-Regel" },
+      { title: "Stundenzettel-Rechner mit 43-Stunden-Regel" },
       {
         name: "description",
         content:
-          "Monatlicher Stundenzettel: Zeiten eintragen, Summen, 42-Stunden-Abgleich und Auszahlung werden automatisch berechnet.",
+          "Monatlicher Stundenzettel: Zeiten eintragen, Summen, 43-Stunden-Abgleich und Auszahlung werden automatisch berechnet.",
       },
-      { property: "og:title", content: "Stundenzettel-Rechner mit 42-Stunden-Regel" },
+      { property: "og:title", content: "Stundenzettel-Rechner mit 43-Stunden-Regel" },
       {
         property: "og:description",
         content:
-          "Zeiten eintragen, Überstunden ab 42 Stunden automatisch berechnen und als CSV oder PDF sichern.",
+          "Zeiten eintragen, Überstunden ab 43 Stunden automatisch berechnen und als CSV oder PDF sichern.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
