@@ -21,17 +21,17 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Stundenzettel-Rechner mit 42-Stunden-Regel" },
+      { title: "Stundenzettel-Rechner mit 43-Stunden-Regel" },
       {
         name: "description",
         content:
-          "Monatlicher Stundenzettel: Zeiten eintragen, Summen, 42-Stunden-Abgleich und Auszahlung werden automatisch berechnet.",
+          "Monatlicher Stundenzettel: Zeiten eintragen, Summen, 43-Stunden-Abgleich und Auszahlung werden automatisch berechnet.",
       },
-      { property: "og:title", content: "Stundenzettel-Rechner mit 42-Stunden-Regel" },
+      { property: "og:title", content: "Stundenzettel-Rechner mit 43-Stunden-Regel" },
       {
         property: "og:description",
         content:
-          "Zeiten eintragen, Überstunden ab 42 Stunden automatisch berechnen und als CSV oder PDF sichern.",
+          "Zeiten eintragen, Überstunden ab 43 Stunden automatisch berechnen und als CSV oder PDF sichern.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -124,9 +124,10 @@ function Timesheet() {
       </header>
 
       <section className="mt-6 grid gap-4 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-raise)] sm:grid-cols-2 lg:grid-cols-5">
-        <Field label="Mitarbeiter">
+        <Field label="Mitarbeiter (optional)">
           <Input
             value={settings.employee}
+            placeholder="Name eintragen"
             onChange={(e) => setSettings({ ...settings, employee: e.target.value })}
           />
         </Field>
@@ -284,7 +285,7 @@ function Timesheet() {
           </p>
           <p className="tabular mt-3 text-3xl font-bold">{formatEuro(totals.totalPay)}</p>
           <p className="mt-2 text-sm opacity-80">
-            {formatHours(totals.totalHours)} Std. · {settings.employee}
+            {formatHours(totals.totalHours)} Std. gesamt
           </p>
         </div>
       </section>
