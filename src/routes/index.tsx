@@ -50,18 +50,20 @@ function Timesheet() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    let next = defaultSettings;
+    let stored: Entry[] = [];
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as { settings: Settings; entries: Entry[] };
-        setSettings({ ...defaultSettings, ...parsed.settings });
-        setEntries(parsed.entries?.length ? parsed.entries : [createEntry()]);
-      } else {
-        setEntries([createEntry()]);
+        next = { ...defaultSettings, ...parsed.settings };
+        stored = parsed.entries ?? [];
       }
     } catch {
-      setEntries([createEntry()]);
+      /* ignore */
     }
+    setSettings(next);
+    setEntries(buildMonthEntries(next.month, stored));
     setLoaded(true);
   }, []);
 
@@ -70,19 +72,20 @@ function Timesheet() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, entries }));
   }, [settings, entries, loaded]);
 
+  const setMonth = (month: string) => {
+    setSettings((prev) => ({ ...prev, month }));
+    setEntries((prev) => buildMonthEntries(month, prev));
+  };
+
   const totals = useMemo(() => calcTotals(entries, settings), [entries, settings]);
   const overCap = totals.totalHours > settings.capHours;
 
   const update = (id: string, patch: Partial<Entry>) =>
     setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
 
-  const addRow = () => setEntries((prev) => [...prev, createEntry()]);
-  const removeRow = (id: string) =>
-    setEntries((prev) => (prev.length > 1 ? prev.filter((e) => e.id !== id) : prev));
-
   const resetMonth = () => {
     if (!confirm("Alle Einträge dieses Monats löschen?")) return;
-    setEntries([createEntry()]);
+    setEntries(buildMonthEntries(settings.month));
   };
 
   const exportCsv = () => {
