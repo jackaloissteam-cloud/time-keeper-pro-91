@@ -44,37 +44,63 @@ export const Route = createFileRoute("/")({
 
 const STORAGE_KEY = "vpt-stundenzettel-v1";
 
+type Store = { settings: Settings; months: Record<string, Entry[]> };
+
+function hasData(entries: Entry[] = []) {
+  return entries.some((e) => e.start || e.end || e.note || e.breakMinutes);
+}
+
 function Timesheet() {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [months, setMonths] = useState<Record<string, Entry[]>>({});
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let next = defaultSettings;
-    let stored: Entry[] = [];
+    let storedMonths: Record<string, Entry[]> = {};
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as { settings: Settings; entries: Entry[] };
+        const parsed = JSON.parse(raw) as Partial<Store> & { entries?: Entry[] };
         next = { ...defaultSettings, ...parsed.settings };
-        stored = parsed.entries ?? [];
+        storedMonths = parsed.months ?? {};
+        // Migration älterer Speicherstände (nur ein Monat)
+        if (!parsed.months && parsed.entries) storedMonths[next.month] = parsed.entries;
       }
     } catch {
       /* ignore */
     }
     setSettings(next);
-    setEntries(buildMonthEntries(next.month, stored));
+    setMonths(storedMonths);
+    setEntries(buildMonthEntries(next.month, storedMonths[next.month] ?? []));
     setLoaded(true);
   }, []);
 
   useEffect(() => {
     if (!loaded) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, entries }));
-  }, [settings, entries, loaded]);
+    const nextMonths = { ...months, [settings.month]: entries };
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ settings, months: nextMonths } satisfies Store),
+    );
+  }, [settings, entries, months, loaded]);
+
+  const savedMonths = useMemo(() => {
+    const keys = new Set(
+      Object.entries(months)
+        .filter(([, v]) => hasData(v))
+        .map(([k]) => k),
+    );
+    if (hasData(entries)) keys.add(settings.month);
+    return Array.from(keys).sort().reverse();
+  }, [months, entries, settings.month]);
 
   const setMonth = (month: string) => {
+    if (!month || month === settings.month) return;
+    setMonths((prev) => ({ ...prev, [settings.month]: entries }));
     setSettings((prev) => ({ ...prev, month }));
-    setEntries((prev) => buildMonthEntries(month, prev));
+    setEntries(buildMonthEntries(month, months[month] ?? []));
   };
 
   const totals = useMemo(() => calcTotals(entries, settings), [entries, settings]);
@@ -101,7 +127,8 @@ function Timesheet() {
   };
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 md:py-12">
+    <main className="print-sheet mx-auto max-w-6xl px-4 py-8 md:py-12">
+
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-6">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
@@ -128,11 +155,10 @@ function Timesheet() {
         </div>
       </header>
 
-      <section className="mt-6 grid gap-4 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-raise)] sm:grid-cols-2 lg:grid-cols-5">
+      <section className="print-compact mt-6 grid gap-4 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-raise)] sm:grid-cols-2 lg:grid-cols-6">
         <Field label="Mitarbeiter (optional)">
           <Input
             value={settings.employee}
-            placeholder="Name eintragen"
             onChange={(e) => setSettings({ ...settings, employee: e.target.value })}
           />
         </Field>
@@ -143,6 +169,23 @@ function Timesheet() {
             onChange={(e) => setMonth(e.target.value)}
           />
         </Field>
+        <Field label="Gespeicherte Monate">
+          <select
+            value={savedMonths.includes(settings.month) ? settings.month : ""}
+            onChange={(e) => setMonth(e.target.value)}
+            className="no-print h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs focus-visible:border-ring focus-visible:outline-none"
+          >
+            <option value="" disabled>
+              {savedMonths.length ? "Monat wählen" : "Noch keine Daten"}
+            </option>
+            {savedMonths.map((m) => (
+              <option key={m} value={m}>
+                {formatMonth(m)}
+              </option>
+            ))}
+          </select>
+        </Field>
+
         <Field label="Basis-Satz (€/Std.)">
           <Input
             type="number"
