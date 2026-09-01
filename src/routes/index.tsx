@@ -163,13 +163,7 @@ function Timesheet() {
         </div>
       </header>
 
-      <section className="print-compact mt-6 grid gap-4 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-raise)] sm:grid-cols-2 lg:grid-cols-6">
-        <Field label="Mitarbeiter (optional)">
-          <Input
-            value={settings.employee}
-            onChange={(e) => setSettings({ ...settings, employee: e.target.value })}
-          />
-        </Field>
+      <section className="print-compact mt-6 grid gap-4 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-raise)] sm:grid-cols-2 lg:grid-cols-5">
         <Field label="Monat">
           <Input
             type="month"
