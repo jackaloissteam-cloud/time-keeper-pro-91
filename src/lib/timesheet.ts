@@ -8,6 +8,7 @@ export type Entry = {
 };
 
 export type Settings = {
+  employee: string;
   month: string; // yyyy-MM
   baseRate: number;
   overtimeRate: number;
@@ -15,6 +16,7 @@ export type Settings = {
 };
 
 export const defaultSettings: Settings = {
+  employee: "",
   month: new Date().toISOString().slice(0, 7),
   baseRate: 13.9,
   overtimeRate: 12,
@@ -153,6 +155,7 @@ export async function downloadXlsx(entries: Entry[], settings: Settings, totals:
   const XLSX = await import("xlsx");
   const rows: (string | number)[][] = [
     ["Stundenzettel", formatMonth(settings.month)],
+    ["Mitarbeiter", settings.employee || ""],
     [],
     ["Datum", "Beginn", "Ende", "Pause (Min)", "Arbeitszeit (Std)", "Tour / Bemerkung"],
     ...entries.map((e) => {
