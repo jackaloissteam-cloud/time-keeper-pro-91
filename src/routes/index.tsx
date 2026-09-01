@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Download, Printer, RotateCcw } from "lucide-react";
+import { Download, FileSpreadsheet, Printer, RotateCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import {
   formatMonth,
   isWeekend,
   toCsv,
+  downloadXlsx,
 } from "@/lib/timesheet";
 
 export const Route = createFileRoute("/")({
@@ -145,6 +146,13 @@ function Timesheet() {
         <div className="no-print flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={exportCsv}>
             <Download /> CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => downloadXlsx(entries, settings, totals)}
+          >
+            <FileSpreadsheet /> Excel
           </Button>
           <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer /> Drucken / PDF
