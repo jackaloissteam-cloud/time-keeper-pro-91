@@ -169,7 +169,28 @@
 
 @layer base {
   @media print {
+    @page { size: A4 portrait; margin: 8mm; }
     .no-print { display: none !important; }
     body { background: white; }
+    html, body { font-size: 9px; }
+    .print-sheet {
+      max-width: none !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+    .print-sheet table { min-width: 0 !important; font-size: 8.5px; }
+    .print-sheet th,
+    .print-sheet td { padding: 1px 4px !important; }
+    .print-sheet input {
+      height: auto !important;
+      padding: 0 2px !important;
+      font-size: 8.5px !important;
+      border: none !important;
+      background: transparent !important;
+    }
+    .print-sheet section,
+    .print-sheet header { break-inside: avoid; margin-top: 6px !important; }
+    .print-sheet .print-compact { gap: 6px !important; }
   }
 }
+
