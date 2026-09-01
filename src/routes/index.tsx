@@ -155,11 +155,10 @@ function Timesheet() {
         </div>
       </header>
 
-      <section className="mt-6 grid gap-4 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-raise)] sm:grid-cols-2 lg:grid-cols-5">
+      <section className="print-compact mt-6 grid gap-4 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-raise)] sm:grid-cols-2 lg:grid-cols-6">
         <Field label="Mitarbeiter (optional)">
           <Input
             value={settings.employee}
-            placeholder="Name eintragen"
             onChange={(e) => setSettings({ ...settings, employee: e.target.value })}
           />
         </Field>
@@ -170,6 +169,23 @@ function Timesheet() {
             onChange={(e) => setMonth(e.target.value)}
           />
         </Field>
+        <Field label="Gespeicherte Monate">
+          <select
+            value={savedMonths.includes(settings.month) ? settings.month : ""}
+            onChange={(e) => setMonth(e.target.value)}
+            className="no-print h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs focus-visible:border-ring focus-visible:outline-none"
+          >
+            <option value="" disabled>
+              {savedMonths.length ? "Monat wählen" : "Noch keine Daten"}
+            </option>
+            {savedMonths.map((m) => (
+              <option key={m} value={m}>
+                {formatMonth(m)}
+              </option>
+            ))}
+          </select>
+        </Field>
+
         <Field label="Basis-Satz (€/Std.)">
           <Input
             type="number"
