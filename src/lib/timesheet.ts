@@ -149,3 +149,37 @@ export function isWeekend(date: string): boolean {
   if (Number.isNaN(d.getTime())) return false;
   return d.getDay() === 0 || d.getDay() === 6;
 }
+
+/** Erzeugt eine Excel-Datei (.xlsx) des aktuellen Monats und lädt sie herunter. */
+export async function downloadXlsx(entries: Entry[], settings: Settings, totals: Totals) {
+  const XLSX = await import("xlsx");
+  const rows: (string | number)[][] = [
+    ["Stundenzettel", formatMonth(settings.month)],
+    ["Mitarbeiter", settings.employee || ""],
+    [],
+    ["Datum", "Beginn", "Ende", "Pause (Min)", "Arbeitszeit (Std)", "Tour / Bemerkung"],
+    ...entries.map((e) => {
+      const h = entryHours(e);
+      return [
+        formatDate(e.date),
+        e.start,
+        e.end,
+        e.breakMinutes || 0,
+        h === null ? "" : h,
+        e.note,
+      ];
+    }),
+    [],
+    ["Gesamtstunden", totals.totalHours],
+    [`Basis-Stunden (bis ${formatHours(settings.capHours)})`, totals.baseHours],
+    ["Überstunden", totals.overtimeHours],
+    [`Summe Basis (${settings.baseRate} €/Std.)`, totals.basePay],
+    [`Summe Überstunden (${settings.overtimeRate} €/Std.)`, totals.overtimePay],
+    ["Gesamtsumme (€)", totals.totalPay],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = [{ wch: 26 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 28 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Stundenzettel");
+  XLSX.writeFile(wb, `Stundenzettel_${settings.month}.xlsx`);
+}
