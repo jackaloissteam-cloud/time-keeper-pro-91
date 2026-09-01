@@ -44,37 +44,63 @@ export const Route = createFileRoute("/")({
 
 const STORAGE_KEY = "vpt-stundenzettel-v1";
 
+type Store = { settings: Settings; months: Record<string, Entry[]> };
+
+function hasData(entries: Entry[] = []) {
+  return entries.some((e) => e.start || e.end || e.note || e.breakMinutes);
+}
+
 function Timesheet() {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [months, setMonths] = useState<Record<string, Entry[]>>({});
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let next = defaultSettings;
-    let stored: Entry[] = [];
+    let storedMonths: Record<string, Entry[]> = {};
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as { settings: Settings; entries: Entry[] };
+        const parsed = JSON.parse(raw) as Partial<Store> & { entries?: Entry[] };
         next = { ...defaultSettings, ...parsed.settings };
-        stored = parsed.entries ?? [];
+        storedMonths = parsed.months ?? {};
+        // Migration älterer Speicherstände (nur ein Monat)
+        if (!parsed.months && parsed.entries) storedMonths[next.month] = parsed.entries;
       }
     } catch {
       /* ignore */
     }
     setSettings(next);
-    setEntries(buildMonthEntries(next.month, stored));
+    setMonths(storedMonths);
+    setEntries(buildMonthEntries(next.month, storedMonths[next.month] ?? []));
     setLoaded(true);
   }, []);
 
   useEffect(() => {
     if (!loaded) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, entries }));
-  }, [settings, entries, loaded]);
+    const nextMonths = { ...months, [settings.month]: entries };
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ settings, months: nextMonths } satisfies Store),
+    );
+  }, [settings, entries, months, loaded]);
+
+  const savedMonths = useMemo(() => {
+    const keys = new Set(
+      Object.entries(months)
+        .filter(([, v]) => hasData(v))
+        .map(([k]) => k),
+    );
+    if (hasData(entries)) keys.add(settings.month);
+    return Array.from(keys).sort().reverse();
+  }, [months, entries, settings.month]);
 
   const setMonth = (month: string) => {
+    if (!month || month === settings.month) return;
+    setMonths((prev) => ({ ...prev, [settings.month]: entries }));
     setSettings((prev) => ({ ...prev, month }));
-    setEntries((prev) => buildMonthEntries(month, prev));
+    setEntries(buildMonthEntries(month, months[month] ?? []));
   };
 
   const totals = useMemo(() => calcTotals(entries, settings), [entries, settings]);
@@ -101,7 +127,8 @@ function Timesheet() {
   };
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 md:py-12">
+    <main className="print-sheet mx-auto max-w-6xl px-4 py-8 md:py-12">
+
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-6">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
