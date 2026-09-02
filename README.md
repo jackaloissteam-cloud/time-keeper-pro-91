@@ -1,58 +1,166 @@
-# VPT Stundenzettel – Dokumentation & Berechnungsschema
+# Stundenzettel-Web-App
 
-Diese Dokumentation beschreibt die Logik und Struktur zur Erstellung des Stundenzettels für **--** (--- GmbH) für den Monat **August 2026**.
+Eine browserbasierte Monatsvorlage zum Erfassen von Arbeitszeiten, Pausen und Bemerkungen. Die App berechnet automatisch die Gesamtstunden, wendet eine gestaffelte Vergütung an und bietet Exporte für Excel und PDF.
 
 ---
 
-## 1. Berechnungsgrundlage & Tariflogik
+## Funktionen
 
-Die Vergütung erfolgt auf Basis eines gestaffelten Stundensatzes mit einer Kappungsgrenze bei **42 Arbeitsstunden** pro Monat:
+- **Kalenderbasierte Eingabe:** Für jeden Monat werden die Tage 1 bis 30/31 vorgegeben, inklusive Wochentagsanzeige.
+- **Automatische Stundenberechnung:** Beginn, Ende und Pause werden pro Tag in Dezimalstunden umgerechnet.
+- **Gestaffelte Vergütung:** Stunden bis zur Kappungsgrenze werden mit dem Basis-Satz vergütet, darüber liegende Stunden mit dem Überstunden-Satz.
+- **Mehrere Monate speichern:** Erfasste Daten werden im Browser (`localStorage`) pro Monat gespeichert und können über ein Dropdown-Menü umgeschaltet werden.
+- **Excel-Export:** Download der aktuellen Monatsvorlage als `.xlsx`.
+- **PDF-Export:** Druckfertiges PDF im A4-Hochformat mit allen Tagen und der Abrechnung.
+- **Druckansicht:** Die Monatsübersicht passt auf eine DIN-A4-Seite.
+- **Mitarbeiterfeld optional:** Das Feld "Mitarbeiter" bleibt standardmäßig leer und wird nicht vorausgefüllt.
+
+---
+
+## Technischer Stack
+
+- **Framework:** [TanStack Start](https://tanstack.com/start) mit React 19 und Vite 8
+- **Sprache:** TypeScript 5
+- **Styling:** Tailwind CSS 4
+- **UI-Komponenten:** shadcn/ui (Radix UI)
+- **State & Data Fetching:** TanStack Query
+- **Build-Ziel:** Edge/Cloudflare Worker (TanStack Start Vite-Template)
+
+---
+
+## Voraussetzungen
+
+- [Node.js](https://nodejs.org/) **22+** oder [Bun](https://bun.sh/) 1.2+
+- Ein Terminal mit Git
+
+> Dieses Projekt verwendet TanStack Start. Im Entwicklungsmodus läuft ein Vite-Dev-Server; für Produktion wird ein Worker-Build erzeugt.
+
+---
+
+## Schritt-für-Schritt: Lokales Setup
+
+### 1. Repository klonen
+
+```bash
+git clone <REPO-URL>
+cd tanstack_start_ts
+```
+
+### 2. Abhängigkeiten installieren
+
+Mit **Bun** (empfohlen, da das Projekt `bun`-basiert ist):
+
+```bash
+bun install
+```
+
+Oder mit **npm**:
+
+```bash
+npm install
+```
+
+### 3. Entwicklungsserver starten
+
+```bash
+bun dev
+```
+
+bzw.
+
+```bash
+npm run dev
+```
+
+Die App ist dann unter folgender URL erreichbar:
+
+```
+http://localhost:8080
+```
+
+Der Server startet üblicherweise auf Port `8080`. Falls der Port belegt ist, schlägt Vite einen alternativen Port vor.
+
+### 4. Produktions-Build erstellen
+
+```bash
+bun run build
+```
+
+bzw.
+
+```bash
+npm run build
+```
+
+Der Build landet im Verzeichnis `dist/`.
+
+### 5. Produktions-Build lokal testen
+
+```bash
+bun run preview
+```
+
+bzw.
+
+```bash
+npm run preview
+```
+
+Auch hier ist die App unter `http://localhost:8080` erreichbar.
+
+---
+
+## Verfügbare Scripts
+
+| Script | Befehl | Beschreibung |
+| :--- | :--- | :--- |
+| `dev` | `bun dev` | Startet den Vite-Dev-Server mit HMR |
+| `build` | `bun run build` | Erstellt einen optimierten Produktions-Build |
+| `build:dev` | `bun run build:dev` | Erstellt einen Entwicklungs-Build |
+| `preview` | `bun run preview` | Serviert den `dist/`-Build lokal |
+| `lint` | `bun run lint` | Führt ESLint über das gesamte Projekt aus |
+| `format` | `bun run format` | Formatiert das Projekt mit Prettier |
+
+---
+
+## Berechnungslogik
+
+Die Vergütung erfolgt auf Basis eines gestaffelten Stundensatzes mit einer Kappungsgrenze:
 
 | Kategorie | Regelung | Stundensatz |
 | :--- | :--- | :---: |
-| **Basis-Arbeitszeit** | Bis maximal 43,00 Stunden | **13,90 € / Std.** |
-| **Überstunden** | Alle Stunden oberhalb von 42,00 Stunden | **12,00 € / Std.** |
+| **Basis-Arbeitszeit** | Bis maximal **43,00 Stunden** | **13,90 € / Std.** |
+| **Überstunden** | Alle Stunden oberhalb von 43,00 Stunden | **12,00 € / Std.** |
+
+### Formeln
+
+- **Arbeitszeit pro Tag (Std):** `(Ende − Beginn) × 24 − Pause / 60`
+- **Gesamtstunden:** Summe aller Tagesstunden
+- **Basis-Stunden:** `MIN(Gesamtstunden; 43)`
+- **Überstunden:** `MAX(0; Gesamtstunden − 43)`
+- **Summe Basis (€):** `Basis-Stunden × 13,90`
+- **Summe Überstunden (€):** `Überstunden × 12,00`
+- **Gesamtsumme (€):** `Summe Basis + Summe Überstunden`
 
 ---
 
-## 2. Abrechnung August 2026
+## Projektstruktur (Auszug)
 
-### Übersicht der geleisteten Arbeitszeiten
-
-* **04.08.2026:** 07:30 – 15:45 (8,25 Std.) – *HU FED RADEV RS FWD HU*
-* **07.08.2026:** 09:15 – 12:45 (3,50 Std.) – *HU MZ WI MZ HU*
-* **10.08.2026:** 09:00 – 15:15 (6,25 Std.) – *HU DITZ MZ HU DITZ FED HU*
-* **12.08.2026:** 12:30 – 15:00 (2,50 Std.) – *HU FW Wölf HU*
-* **13.08.2026:** 09:10 – 15:45 (6,58 Std.) – *HU LAD WFD HU MZ MZ HU*
-* **17.08.2026:** 07:00 – 12:30 (5,50 Std.) – *HU AB Kirch HERSF HU*
-* **18.08.2026:** 08:30 – 10:50 (2,33 Std.) – *HU FWD HU HU*
-* **19.08.2026:** 11:00 – 15:25 (4,42 Std.) – *HU URSEL HU RÖDEL FWD HU*
-* **20.08.2026:** 11:00 – 16:25 (5,42 Std.) – *HU FWD HU FWD HU*
-* **21.08.2026:** 07:45 – 13:05 (5,33 Std.) – *Esee ROCK GREBEN HU HU FWD HU*
-* **24.08.2026:** 10:00 – 15:10 (5,17 Std.) – *HU F MZ WI F HU*
-
-**Gesamtarbeitszeit:** **55,25 Stunden**
+```text
+src/
+├── lib/timesheet.ts      # Berechnungslogik, Speicherung, Excel-/PDF-Export
+├── routes/
+│   ├── __root.tsx        # Root-Layout
+│   ├── index.tsx         # Hauptseite mit der Monatsvorlage
+│   └── api/              # Server-Routen (TanStack Start)
+├── styles.css            # Tailwind-Designsystem
+└── ...
+```
 
 ---
 
-### Finanzielle Aufschlüsselung
+## Hinweise
 
-$$\text{Basis-Stunden: } 43{,}00 \text{ Std.} \times 13{,}90 \text{ €/Std.} = 583{,}80 \text{ €}$$
-
-$$\text{Überstunden: } 13{,}25 \text{ Std.} \times 12{,}00 \text{ €/Std.} = 159{,}00 \text{ €}$$
-
-$$\mathbf{Auszahlungsbetrag (Gesamtsumme): } \mathbf{742{,}80 \text{ €}}$$
-
----
-
-## 3. Tabellenstruktur & Formeln (für OpenOffice / LibreOffice / Excel)
-
-| Feld | Formel / Ausdrücke |
-| :--- | :--- |
-| **Arbeitszeit pro Tag (Std)** | `=IF(AND(B5<>""; C5<>""); (C5-B5)*24 - (IF(D5<>""; D5; 0)/60); "")` |
-| **Gesamtstunden (Summe)** | `=SUM(E5:E35)` *(Ergebnis: 55,25)* |
-| **Basis-Stunden (bis 42h)** | `=MIN(E35; 42)` *(Ergebnis: 43,00)* |
-| **Überstunden (über 42h)** | `=MAX(0; E35-42)` *(Ergebnis: 13,25)* |
-| **Summe Basis (€)** | `=Basis_Stunden * 13,90` *(Ergebnis: 583,80 €)* |
-| **Summe Überstunden (€)** | `=Überstunden * 12,00` *(Ergebnis: 159,00 €)* |
-| **Gesamtsumme (€)** | `=Summe_Basis + Summe_Überstunden` *(Ergebnis: 742,80 €)* |
+- **Kein Backend nötig:** Alle Daten werden lokal im Browser gespeichert. Für einen geteilten Zugang kann die App veröffentlicht werden.
+- **Keine persönlichen Daten vorausgefüllt:** Weder Firmenname noch Mitarbeitername sind in der Vorlage enthalten.
+- **Drucken:** Über den PDF-Button oder die Browser-Druckfunktion (`Strg + P` / `Cmd + P`) kann die Monatsübersicht ausgedruckt werden.
