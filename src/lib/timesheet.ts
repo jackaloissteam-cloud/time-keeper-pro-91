@@ -183,3 +183,74 @@ export async function downloadXlsx(entries: Entry[], settings: Settings, totals:
   XLSX.utils.book_append_sheet(wb, ws, "Stundenzettel");
   XLSX.writeFile(wb, `Stundenzettel_${settings.month}.xlsx`);
 }
+
+/** Erzeugt ein A4-PDF (Hochformat) des gesamten Monats und lädt es herunter. */
+export async function downloadPdf(entries: Entry[], settings: Settings, totals: Totals) {
+  const { jsPDF } = await import("jspdf");
+  const autoTable = (await import("jspdf-autotable")).default;
+
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+  doc.setFontSize(16);
+  doc.text("Stundenzettel", 14, 16);
+  doc.setFontSize(11);
+  doc.text(formatMonth(settings.month), 14, 23);
+  if (settings.employee) doc.text(`Mitarbeiter: ${settings.employee}`, 14, 29);
+
+  const head = [["Datum", "Beginn", "Ende", "Pause (Min)", "Stunden", "Tour / Bemerkung"]];
+  const body = entries.map((e) => {
+    const h = entryHours(e);
+    return [
+      formatDate(e.date),
+      e.start || "",
+      e.end || "",
+      e.breakMinutes ? String(e.breakMinutes) : "",
+      h === null ? "" : formatHours(h),
+      e.note || "",
+    ];
+  });
+
+  autoTable(doc, {
+    head,
+    body,
+    startY: settings.employee ? 33 : 27,
+    styles: { fontSize: 8, cellPadding: 1.4 },
+    headStyles: { fillColor: [31, 63, 110], textColor: 255, fontSize: 8 },
+    columnStyles: {
+      0: { cellWidth: 30 },
+      1: { cellWidth: 18, halign: "center" },
+      2: { cellWidth: 18, halign: "center" },
+      3: { cellWidth: 22, halign: "center" },
+      4: { cellWidth: 20, halign: "right" },
+      5: { cellWidth: "auto" },
+    },
+    theme: "grid",
+  });
+
+  const y = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 60) + 6;
+
+  autoTable(doc, {
+    startY: y,
+    body: [
+      ["Gesamtstunden", `${formatHours(totals.totalHours)} Std.`],
+      [
+        `Basis-Stunden (bis ${formatHours(settings.capHours)})`,
+        `${formatHours(totals.baseHours)} Std.`,
+      ],
+      ["Überstunden", `${formatHours(totals.overtimeHours)} Std.`],
+      [`Summe Basis (${formatEuro(settings.baseRate)}/Std.)`, formatEuro(totals.basePay)],
+      [
+        `Summe Überstunden (${formatEuro(settings.overtimeRate)}/Std.)`,
+        formatEuro(totals.overtimePay),
+      ],
+      ["Auszahlung gesamt", formatEuro(totals.totalPay)],
+    ],
+    styles: { fontSize: 9, cellPadding: 1.8 },
+    columnStyles: { 0: { cellWidth: 80 }, 1: { halign: "right", fontStyle: "bold" } },
+    theme: "plain",
+    margin: { left: 14 },
+    tableWidth: 120,
+  });
+
+  doc.save(`Stundenzettel_${settings.month}.pdf`);
+}

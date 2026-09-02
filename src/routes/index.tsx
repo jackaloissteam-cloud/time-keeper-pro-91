@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Download, FileSpreadsheet, Printer, RotateCcw, X } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Printer, RotateCcw, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import {
   isWeekend,
   toCsv,
   downloadXlsx,
+  downloadPdf,
 } from "@/lib/timesheet";
 
 export const Route = createFileRoute("/")({
@@ -154,9 +155,17 @@ function Timesheet() {
           >
             <FileSpreadsheet /> Excel
           </Button>
-          <Button variant="outline" size="sm" onClick={() => window.print()}>
-            <Printer /> Drucken / PDF
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => downloadPdf(entries, settings, totals)}
+          >
+            <FileText /> PDF
           </Button>
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Printer /> Drucken
+          </Button>
+
           <Button variant="ghost" size="sm" onClick={resetMonth}>
             <RotateCcw /> Monat leeren
           </Button>
