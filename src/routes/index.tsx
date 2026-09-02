@@ -308,7 +308,7 @@ function Timesheet() {
               <td className="tabular px-3 py-3 text-right text-base font-bold">
                 {formatHours(totals.totalHours)}
               </td>
-              <td className="px-3 py-3 text-sm">
+              <td colSpan={2} className="px-3 py-3 text-sm">
                 {overCap ? (
                   <span className="font-medium text-warning-foreground">
                     {formatHours(totals.overtimeHours)} Std. über der Grenze
