@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Download, FileSpreadsheet, Printer, RotateCcw } from "lucide-react";
+import { Download, FileSpreadsheet, Printer, RotateCcw, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -234,12 +234,14 @@ function Timesheet() {
                   </th>
                 ),
               )}
+              <th className="no-print w-10 px-2 py-2.5" aria-label="Zeile leeren" />
             </tr>
           </thead>
           <tbody>
             {entries.map((entry) => {
               const hours = entryHours(entry);
               const weekend = isWeekend(entry.date);
+              const filled = Boolean(entry.start || entry.end || entry.note || entry.breakMinutes);
               return (
                 <tr
                   key={entry.id}
@@ -265,7 +267,8 @@ function Timesheet() {
                   <td className="px-2 py-1.5">
                     <CellInput
                       type="number"
-                      value={String(entry.breakMinutes ?? 0)}
+                      value={entry.breakMinutes ? String(entry.breakMinutes) : ""}
+                      placeholder="0"
                       onChange={(v) => update(entry.id, { breakMinutes: Number(v) || 0 })}
                     />
                   </td>
@@ -278,6 +281,20 @@ function Timesheet() {
                       onChange={(v) => update(entry.id, { note: v })}
                       placeholder="z. B. HU FED RADEV HU"
                     />
+                  </td>
+                  <td className="no-print px-1 py-1.5 text-center">
+                    <button
+                      type="button"
+                      disabled={!filled}
+                      onClick={() =>
+                        update(entry.id, { start: "", end: "", breakMinutes: 0, note: "" })
+                      }
+                      title={`Eintrag ${dayLabel(entry.date)} löschen`}
+                      aria-label={`Eintrag ${dayLabel(entry.date)} löschen`}
+                      className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                    >
+                      <X className="size-4" />
+                    </button>
                   </td>
                 </tr>
               );
