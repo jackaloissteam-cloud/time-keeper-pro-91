@@ -154,9 +154,17 @@ function Timesheet() {
           >
             <FileSpreadsheet /> Excel
           </Button>
-          <Button variant="outline" size="sm" onClick={() => window.print()}>
-            <Printer /> Drucken / PDF
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => downloadPdf(entries, settings, totals)}
+          >
+            <FileText /> PDF
           </Button>
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Printer /> Drucken
+          </Button>
+
           <Button variant="ghost" size="sm" onClick={resetMonth}>
             <RotateCcw /> Monat leeren
           </Button>
