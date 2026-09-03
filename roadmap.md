@@ -1,7 +1,7 @@
 # Roadmap
 
 - [x] App lokal ausführen (läuft auf http://localhost:8080)
-- [ ] PDF-Export prüfen (A4, kompletter Monat, Stunden/Pausen/Auszahlung)
-- [ ] Excel-Export prüfen
-- [x] Pulldown „Gespeicherte Monate" prüfen (Select vorhanden, 1x im DOM)
-- [ ] Fix: Android übernimmt eingegebene Startzeit nicht (Zeit-Eingabe)
+- [x] PDF-Export prüfen (1 Seite A4, Datum/Zeiten/Pause/Stunden, Gesamt 16,75 Std., Sätze 13,90/12,00 €)
+- [x] Excel-Export prüfen (41 Zeilen, alle Tage, Summen korrekt)
+- [x] Pulldown „Gespeicherte Monate" prüfen (Wechsel Sep↔Okt, Daten bleiben erhalten)
+- [x] Fix: Android-Zeiteingabe (onInput/onBlur ergänzt, change-Event wird übernommen)
