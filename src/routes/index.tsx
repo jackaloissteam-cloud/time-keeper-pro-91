@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Download, FileSpreadsheet, FileText, Printer, RotateCcw, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Cloud, Download, FileSpreadsheet, FileText, Printer, RotateCcw, X } from "lucide-react";
+import { toast } from "sonner";
 
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,13 +31,13 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Monatlicher Stundenzettel: Zeiten eintragen, Summen, 43-Stunden-Abgleich und Auszahlung werden automatisch berechnet.",
+          "Gemeinsamer monatlicher Stundenzettel: Zeiten eintragen, Summen, 43-Stunden-Abgleich und Auszahlung werden automatisch berechnet und online geteilt.",
       },
       { property: "og:title", content: "Stundenzettel-Rechner mit 43-Stunden-Regel" },
       {
         property: "og:description",
         content:
-          "Zeiten eintragen, Überstunden ab 43 Stunden automatisch berechnen und als CSV oder PDF sichern.",
+          "Zeiten gemeinsam eintragen, Überstunden ab 43 Stunden automatisch berechnen und als Excel oder PDF sichern.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -44,9 +46,8 @@ export const Route = createFileRoute("/")({
   component: Timesheet,
 });
 
-const STORAGE_KEY = "vpt-stundenzettel-v1";
-
-type Store = { settings: Settings; months: Record<string, Entry[]> };
+type MonthRow = { month: string; employee: string; entries: Entry[] };
+type MonthMap = Record<string, MonthRow>;
 
 function hasData(entries: Entry[] = []) {
   return entries.some((e) => e.start || e.end || e.note || e.breakMinutes);
@@ -54,55 +55,148 @@ function hasData(entries: Entry[] = []) {
 
 function Timesheet() {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [months, setMonths] = useState<Record<string, Entry[]>>({});
+  const [months, setMonths] = useState<MonthMap>({});
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [online, setOnline] = useState(true);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Initial laden: Einstellungen + alle Monate
   useEffect(() => {
-    let next = defaultSettings;
-    let storedMonths: Record<string, Entry[]> = {};
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<Store> & { entries?: Entry[] };
-        next = { ...defaultSettings, ...parsed.settings };
-        storedMonths = parsed.months ?? {};
-        // Migration älterer Speicherstände (nur ein Monat)
-        if (!parsed.months && parsed.entries) storedMonths[next.month] = parsed.entries;
+    let cancelled = false;
+    (async () => {
+      const [{ data: srow, error: sErr }, { data: mrows, error: mErr }] = await Promise.all([
+        supabase.from("timesheet_settings").select("*").eq("id", 1).single(),
+        supabase.from("timesheet_months").select("*"),
+      ]);
+      if (cancelled) return;
+      if (sErr || mErr) {
+        setOnline(false);
+        toast.error("Online-Speicher nicht erreichbar – Änderungen werden nicht geteilt.");
+        setEntries(buildMonthEntries(defaultSettings.month));
+        setLoaded(true);
+        return;
       }
-    } catch {
-      /* ignore */
-    }
-    setSettings(next);
-    setMonths(storedMonths);
-    setEntries(buildMonthEntries(next.month, storedMonths[next.month] ?? []));
-    setLoaded(true);
+      const next: Settings = { ...defaultSettings };
+      if (srow) {
+        next.baseRate = Number(srow.base_rate);
+        next.overtimeRate = Number(srow.overtime_rate);
+        next.capHours = Number(srow.cap_hours);
+      }
+      const map: MonthMap = {};
+      for (const row of mrows ?? []) {
+        map[row.month] = {
+          month: row.month,
+          employee: row.employee ?? "",
+          entries: (row.entries ?? []) as Entry[],
+        };
+      }
+      next.employee = map[next.month]?.employee ?? "";
+      setSettings(next);
+      setMonths(map);
+      setEntries(buildMonthEntries(next.month, map[next.month]?.entries ?? []));
+      setLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  // Echtzeit: Änderungen anderer Nutzer übernehmen
   useEffect(() => {
-    if (!loaded) return;
-    const nextMonths = { ...months, [settings.month]: entries };
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ settings, months: nextMonths } satisfies Store),
-    );
-  }, [settings, entries, months, loaded]);
+    const channel = supabase
+      .channel("timesheet")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "timesheet_months" },
+        (payload) => {
+          const row = payload.new as {
+            month: string;
+            employee: string;
+            entries: Entry[];
+          };
+          setMonths((prev) => ({
+            ...prev,
+            [row.month]: { month: row.month, employee: row.employee ?? "", entries: row.entries ?? [] },
+          }));
+          setSettings((prev) => {
+            if (prev.month !== row.month) return prev;
+            setEntries((current) =>
+              JSON.stringify(current.map(({ id, ...rest }) => rest)) ===
+              JSON.stringify((row.entries ?? []).map(({ id, ...rest }) => rest))
+                ? current
+                : buildMonthEntries(row.month, row.entries ?? []),
+            );
+            return { ...prev, employee: row.employee ?? "" };
+          });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "timesheet_settings" },
+        (payload) => {
+          const row = payload.new as {
+            base_rate: number;
+            overtime_rate: number;
+            cap_hours: number;
+          };
+          setSettings((prev) => ({
+            ...prev,
+            baseRate: Number(row.base_rate),
+            overtimeRate: Number(row.overtime_rate),
+            capHours: Number(row.cap_hours),
+          }));
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Änderungen verzögert online speichern
+  useEffect(() => {
+    if (!loaded || !online) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      const { error: mErr } = await supabase.from("timesheet_months").upsert({
+        month: settings.month,
+        employee: settings.employee,
+        entries,
+        updated_at: new Date().toISOString(),
+      });
+      const { error: sErr } = await supabase.from("timesheet_settings").upsert({
+        id: 1,
+        base_rate: settings.baseRate,
+        overtime_rate: settings.overtimeRate,
+        cap_hours: settings.capHours,
+        updated_at: new Date().toISOString(),
+      });
+      if (mErr || sErr) toast.error("Speichern fehlgeschlagen – bitte Verbindung prüfen.");
+    }, 800);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, [settings, entries, loaded, online]);
 
   const savedMonths = useMemo(() => {
     const keys = new Set(
-      Object.entries(months)
-        .filter(([, v]) => hasData(v))
-        .map(([k]) => k),
+      Object.values(months)
+        .filter((m) => hasData(m.entries) || m.employee)
+        .map((m) => m.month),
     );
-    if (hasData(entries)) keys.add(settings.month);
+    if (hasData(entries) || settings.employee) keys.add(settings.month);
     return Array.from(keys).sort().reverse();
-  }, [months, entries, settings.month]);
+  }, [months, entries, settings.month, settings.employee]);
 
   const setMonth = (month: string) => {
     if (!month || month === settings.month) return;
-    setMonths((prev) => ({ ...prev, [settings.month]: entries }));
-    setSettings((prev) => ({ ...prev, month }));
-    setEntries(buildMonthEntries(month, months[month] ?? []));
+    setMonths((prev) => ({
+      ...prev,
+      [settings.month]: { month: settings.month, employee: settings.employee, entries },
+    }));
+    setSettings((prev) => ({ ...prev, month, employee: months[month]?.employee ?? "" }));
+    setEntries(buildMonthEntries(month, months[month]?.entries ?? []));
   };
 
   const totals = useMemo(() => calcTotals(entries, settings), [entries, settings]);
@@ -117,7 +211,7 @@ function Timesheet() {
   };
 
   const exportCsv = () => {
-    const blob = new Blob(["\uFEFF" + toCsv(entries, settings, totals)], {
+    const blob = new Blob(["﻿" + toCsv(entries, settings, totals)], {
       type: "text/csv;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);
@@ -142,6 +236,12 @@ function Timesheet() {
           <p className="mt-1 text-sm text-muted-foreground">
             Bis {formatHours(settings.capHours)} Std. zu {formatEuro(settings.baseRate)}/Std., jede
             weitere Stunde zu {formatEuro(settings.overtimeRate)}/Std.
+          </p>
+          <p className="no-print mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+            <Cloud className="size-3.5" />
+            {online
+              ? "Geteilt – alle mit dem Link sehen und bearbeiten denselben Zettel."
+              : "Offline – Online-Speicher nicht erreichbar."}
           </p>
         </div>
         <div className="no-print flex flex-wrap gap-2">
@@ -358,8 +458,9 @@ function Timesheet() {
       </section>
 
       <p className="mt-6 text-xs text-muted-foreground">
-        Eingaben werden automatisch in diesem Browser gespeichert. Schichten über Mitternacht (z. B.
-        22:00 – 05:00) werden korrekt berechnet.
+        Eingaben werden automatisch online gespeichert und mit allen geteilt, die den Link öffnen –
+        Änderungen erscheinen in Echtzeit. Schichten über Mitternacht (z. B. 22:00 – 05:00) werden
+        korrekt berechnet.
       </p>
     </main>
   );
