@@ -14,7 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      timesheet_months: {
+        Row: {
+          employee: string
+          entries: Json
+          month: string
+          updated_at: string
+        }
+        Insert: {
+          employee?: string
+          entries?: Json
+          month: string
+          updated_at?: string
+        }
+        Update: {
+          employee?: string
+          entries?: Json
+          month?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      timesheet_settings: {
+        Row: {
+          base_rate: number
+          cap_hours: number
+          id: number
+          overtime_rate: number
+          updated_at: string
+        }
+        Insert: {
+          base_rate?: number
+          cap_hours?: number
+          id?: number
+          overtime_rate?: number
+          updated_at?: string
+        }
+        Update: {
+          base_rate?: number
+          cap_hours?: number
+          id?: number
+          overtime_rate?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
