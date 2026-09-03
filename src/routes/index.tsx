@@ -393,6 +393,8 @@ function CellInput({
       value={value}
       placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
+      onInput={(e) => onChange((e.target as HTMLInputElement).value)}
+      onBlur={(e) => onChange(e.target.value)}
       className="h-8 border-transparent bg-transparent px-2 shadow-none focus-visible:border-input focus-visible:bg-background"
     />
   );
