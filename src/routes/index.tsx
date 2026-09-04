@@ -172,13 +172,15 @@ function Timesheet() {
         entries,
         updated_at: new Date().toISOString(),
       });
-      const { error: sErr } = await supabase.from("timesheet_settings").upsert({
-        id: 1,
-        base_rate: settings.baseRate,
-        overtime_rate: settings.overtimeRate,
-        cap_hours: settings.capHours,
-        updated_at: new Date().toISOString(),
-      });
+      const { error: sErr } = await supabase
+        .from("timesheet_settings")
+        .update({
+          base_rate: settings.baseRate,
+          overtime_rate: settings.overtimeRate,
+          cap_hours: settings.capHours,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", 1);
       if (mErr || sErr) {
         dirty.current = true;
         toast.error("Speichern fehlgeschlagen – bitte Verbindung prüfen.");
