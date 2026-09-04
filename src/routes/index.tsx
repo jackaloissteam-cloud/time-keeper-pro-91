@@ -160,11 +160,12 @@ function Timesheet() {
     };
   }, []);
 
-  // Änderungen verzögert online speichern
+  // Änderungen verzögert online speichern (nur nach echten Eingaben)
   useEffect(() => {
-    if (!loaded || !online) return;
+    if (!loaded || !online || !dirty.current) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
+      dirty.current = false;
       const { error: mErr } = await supabase.from("timesheet_months").upsert({
         month: settings.month,
         employee: settings.employee,
@@ -178,12 +179,20 @@ function Timesheet() {
         cap_hours: settings.capHours,
         updated_at: new Date().toISOString(),
       });
-      if (mErr || sErr) toast.error("Speichern fehlgeschlagen – bitte Verbindung prüfen.");
+      if (mErr || sErr) {
+        dirty.current = true;
+        toast.error("Speichern fehlgeschlagen – bitte Verbindung prüfen.");
+      }
     }, 800);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, [settings, entries, loaded, online]);
+
+  const changeSettings = (patch: Partial<Settings>) => {
+    dirty.current = true;
+    setSettings((prev) => ({ ...prev, ...patch }));
+  };
 
   const savedMonths = useMemo(() => {
     const keys = new Set(
@@ -197,6 +206,7 @@ function Timesheet() {
 
   const setMonth = (month: string) => {
     if (!month || month === settings.month) return;
+    dirty.current = false; // Monatswechsel selbst ist keine Eingabe
     setMonths((prev) => ({
       ...prev,
       [settings.month]: { month: settings.month, employee: settings.employee, entries },
