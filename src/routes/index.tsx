@@ -304,7 +304,7 @@ function Timesheet() {
         <Field label="Mitarbeiter (optional)">
           <Input
             value={settings.employee}
-            onChange={(e) => setSettings({ ...settings, employee: e.target.value })}
+            onChange={(e) => changeSettings({ employee: e.target.value })}
           />
         </Field>
         <Field label="Monat">
@@ -336,7 +336,7 @@ function Timesheet() {
             type="number"
             step="0.01"
             value={settings.baseRate}
-            onChange={(e) => setSettings({ ...settings, baseRate: Number(e.target.value) })}
+            onChange={(e) => changeSettings({ baseRate: Number(e.target.value) })}
           />
         </Field>
         <Field label="Überstunden-Satz (€/Std.)">
@@ -344,7 +344,7 @@ function Timesheet() {
             type="number"
             step="0.01"
             value={settings.overtimeRate}
-            onChange={(e) => setSettings({ ...settings, overtimeRate: Number(e.target.value) })}
+            onChange={(e) => changeSettings({ overtimeRate: Number(e.target.value) })}
           />
         </Field>
         <Field label="Kappungsgrenze (Std.)">
@@ -352,7 +352,7 @@ function Timesheet() {
             type="number"
             step="0.25"
             value={settings.capHours}
-            onChange={(e) => setSettings({ ...settings, capHours: Number(e.target.value) })}
+            onChange={(e) => changeSettings({ capHours: Number(e.target.value) })}
           />
         </Field>
       </section>
