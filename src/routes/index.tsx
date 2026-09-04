@@ -1,9 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Cloud, Download, FileSpreadsheet, FileText, Printer, RotateCcw, X } from "lucide-react";
-import { toast } from "sonner";
+import { useEffect, useMemo, useState } from "react";
+import { Download, FileSpreadsheet, FileText, Laptop, Printer, RotateCcw, X } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,13 +29,13 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Gemeinsamer monatlicher Stundenzettel: Zeiten eintragen, Summen, 43-Stunden-Abgleich und Auszahlung werden automatisch berechnet und online geteilt.",
+          "Persönlicher monatlicher Stundenzettel: Zeiten eintragen, Summen, 43-Stunden-Abgleich und Auszahlung werden automatisch berechnet – Daten bleiben nur auf dem eigenen Gerät.",
       },
       { property: "og:title", content: "Stundenzettel-Rechner mit 43-Stunden-Regel" },
       {
         property: "og:description",
         content:
-          "Zeiten gemeinsam eintragen, Überstunden ab 43 Stunden automatisch berechnen und als Excel oder PDF sichern.",
+          "Zeiten eintragen, Überstunden ab 43 Stunden automatisch berechnen und als Excel oder PDF sichern – lokal auf dem eigenen Gerät.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -46,8 +44,11 @@ export const Route = createFileRoute("/")({
   component: Timesheet,
 });
 
+const STORAGE_KEY = "vpt-stundenzettel-v2";
+
 type MonthRow = { month: string; employee: string; entries: Entry[] };
 type MonthMap = Record<string, MonthRow>;
+type Stored = { settings: Partial<Settings>; months: MonthMap };
 
 function hasData(entries: Entry[] = []) {
   return entries.some((e) => e.start || e.end || e.note || e.breakMinutes);
@@ -58,141 +59,50 @@ function Timesheet() {
   const [months, setMonths] = useState<MonthMap>({});
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [online, setOnline] = useState(true);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dirty = useRef(false);
 
-  // Initial laden: Einstellungen + alle Monate
+  // Nur lokal laden – keine Daten verlassen dieses Gerät
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const [{ data: srow, error: sErr }, { data: mrows, error: mErr }] = await Promise.all([
-        supabase.from("timesheet_settings").select("*").eq("id", 1).single(),
-        supabase.from("timesheet_months").select("*"),
-      ]);
-      if (cancelled) return;
-      if (sErr || mErr) {
-        setOnline(false);
-        toast.error("Online-Speicher nicht erreichbar – Änderungen werden nicht geteilt.");
-        setEntries(buildMonthEntries(defaultSettings.month));
-        setLoaded(true);
-        return;
-      }
-      const next: Settings = { ...defaultSettings };
-      if (srow) {
-        next.baseRate = Number(srow.base_rate);
-        next.overtimeRate = Number(srow.overtime_rate);
-        next.capHours = Number(srow.cap_hours);
-      }
-      const map: MonthMap = {};
-      for (const row of mrows ?? []) {
-        map[row.month] = {
-          month: row.month,
-          employee: row.employee ?? "",
-          entries: (row.entries ?? []) as Entry[],
-        };
-      }
-      next.employee = map[next.month]?.employee ?? "";
-      setSettings(next);
-      setMonths(map);
-      setEntries(buildMonthEntries(next.month, map[next.month]?.entries ?? []));
-      setLoaded(true);
-    })();
-    return () => {
-      cancelled = true;
-    };
+    let stored: Stored | null = null;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) stored = JSON.parse(raw) as Stored;
+    } catch {
+      stored = null;
+    }
+    const next: Settings = { ...defaultSettings, ...(stored?.settings ?? {}) };
+    next.month = defaultSettings.month;
+    const map = stored?.months ?? {};
+    next.employee = map[next.month]?.employee ?? next.employee ?? "";
+    setSettings(next);
+    setMonths(map);
+    setEntries(buildMonthEntries(next.month, map[next.month]?.entries ?? []));
+    setLoaded(true);
   }, []);
 
-  // Echtzeit: Änderungen anderer Nutzer übernehmen
+  // Lokal speichern
   useEffect(() => {
-    const channel = supabase
-      .channel("timesheet")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "timesheet_months" },
-        (payload) => {
-          const row = payload.new as {
-            month: string;
-            employee: string;
-            entries: Entry[];
-          };
-          setMonths((prev) => ({
-            ...prev,
-            [row.month]: { month: row.month, employee: row.employee ?? "", entries: row.entries ?? [] },
-          }));
-          setSettings((prev) => {
-            if (prev.month !== row.month) return prev;
-            setEntries((current) =>
-              dirty.current ||
-              JSON.stringify(current.map(({ id, ...rest }) => rest)) ===
-                JSON.stringify((row.entries ?? []).map(({ id, ...rest }) => rest))
-                ? current
-                : buildMonthEntries(row.month, row.entries ?? []),
-            );
-            return dirty.current ? prev : { ...prev, employee: row.employee ?? "" };
-          });
-        },
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "timesheet_settings" },
-        (payload) => {
-          const row = payload.new as {
-            base_rate: number;
-            overtime_rate: number;
-            cap_hours: number;
-          };
-          setSettings((prev) =>
-            dirty.current
-              ? prev
-              : {
-                  ...prev,
-                  baseRate: Number(row.base_rate),
-                  overtimeRate: Number(row.overtime_rate),
-                  capHours: Number(row.cap_hours),
-                },
-          );
-        },
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
+    if (!loaded) return;
+    const all: MonthMap = {
+      ...months,
+      [settings.month]: { month: settings.month, employee: settings.employee, entries },
     };
-  }, []);
-
-  // Änderungen verzögert online speichern (nur nach echten Eingaben)
-  useEffect(() => {
-    if (!loaded || !online || !dirty.current) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      dirty.current = false;
-      const { error: mErr } = await supabase.from("timesheet_months").upsert({
-        month: settings.month,
+    const payload: Stored = {
+      settings: {
         employee: settings.employee,
-        entries,
-        updated_at: new Date().toISOString(),
-      });
-      const { error: sErr } = await supabase
-        .from("timesheet_settings")
-        .update({
-          base_rate: settings.baseRate,
-          overtime_rate: settings.overtimeRate,
-          cap_hours: settings.capHours,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", 1);
-      if (mErr || sErr) {
-        dirty.current = true;
-        toast.error("Speichern fehlgeschlagen – bitte Verbindung prüfen.");
-      }
-    }, 800);
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
+        baseRate: settings.baseRate,
+        overtimeRate: settings.overtimeRate,
+        capHours: settings.capHours,
+      },
+      months: all,
     };
-  }, [settings, entries, loaded, online]);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      /* Speicher voll oder gesperrt */
+    }
+  }, [settings, entries, months, loaded]);
 
   const changeSettings = (patch: Partial<Settings>) => {
-    dirty.current = true;
     setSettings((prev) => ({ ...prev, ...patch }));
   };
 
@@ -208,16 +118,6 @@ function Timesheet() {
 
   const setMonth = (month: string) => {
     if (!month || month === settings.month) return;
-    // Ungespeicherte Eingaben des bisherigen Monats sofort sichern
-    if (dirty.current && online) {
-      supabase.from("timesheet_months").upsert({
-        month: settings.month,
-        employee: settings.employee,
-        entries,
-        updated_at: new Date().toISOString(),
-      });
-    }
-    dirty.current = false; // Monatswechsel selbst ist keine Eingabe
     setMonths((prev) => ({
       ...prev,
       [settings.month]: { month: settings.month, employee: settings.employee, entries },
@@ -230,13 +130,11 @@ function Timesheet() {
   const overCap = totals.totalHours > settings.capHours;
 
   const update = (id: string, patch: Partial<Entry>) => {
-    dirty.current = true;
     setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
   };
 
   const resetMonth = () => {
     if (!confirm("Alle Einträge dieses Monats löschen?")) return;
-    dirty.current = true;
     setEntries(buildMonthEntries(settings.month));
   };
 
@@ -251,6 +149,7 @@ function Timesheet() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
 
   return (
     <main className="print-sheet mx-auto max-w-6xl px-4 py-8 md:py-12">
