@@ -60,6 +60,7 @@ function Timesheet() {
   const [loaded, setLoaded] = useState(false);
   const [online, setOnline] = useState(true);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dirty = useRef(false);
 
   // Initial laden: Einstellungen + alle Monate
   useEffect(() => {
@@ -122,12 +123,13 @@ function Timesheet() {
           setSettings((prev) => {
             if (prev.month !== row.month) return prev;
             setEntries((current) =>
+              dirty.current ||
               JSON.stringify(current.map(({ id, ...rest }) => rest)) ===
-              JSON.stringify((row.entries ?? []).map(({ id, ...rest }) => rest))
+                JSON.stringify((row.entries ?? []).map(({ id, ...rest }) => rest))
                 ? current
                 : buildMonthEntries(row.month, row.entries ?? []),
             );
-            return { ...prev, employee: row.employee ?? "" };
+            return dirty.current ? prev : { ...prev, employee: row.employee ?? "" };
           });
         },
       )
@@ -140,12 +142,16 @@ function Timesheet() {
             overtime_rate: number;
             cap_hours: number;
           };
-          setSettings((prev) => ({
-            ...prev,
-            baseRate: Number(row.base_rate),
-            overtimeRate: Number(row.overtime_rate),
-            capHours: Number(row.cap_hours),
-          }));
+          setSettings((prev) =>
+            dirty.current
+              ? prev
+              : {
+                  ...prev,
+                  baseRate: Number(row.base_rate),
+                  overtimeRate: Number(row.overtime_rate),
+                  capHours: Number(row.cap_hours),
+                },
+          );
         },
       )
       .subscribe();
