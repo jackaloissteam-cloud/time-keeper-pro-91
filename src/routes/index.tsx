@@ -206,6 +206,15 @@ function Timesheet() {
 
   const setMonth = (month: string) => {
     if (!month || month === settings.month) return;
+    // Ungespeicherte Eingaben des bisherigen Monats sofort sichern
+    if (dirty.current && online) {
+      supabase.from("timesheet_months").upsert({
+        month: settings.month,
+        employee: settings.employee,
+        entries,
+        updated_at: new Date().toISOString(),
+      });
+    }
     dirty.current = false; // Monatswechsel selbst ist keine Eingabe
     setMonths((prev) => ({
       ...prev,
@@ -218,11 +227,14 @@ function Timesheet() {
   const totals = useMemo(() => calcTotals(entries, settings), [entries, settings]);
   const overCap = totals.totalHours > settings.capHours;
 
-  const update = (id: string, patch: Partial<Entry>) =>
+  const update = (id: string, patch: Partial<Entry>) => {
+    dirty.current = true;
     setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+  };
 
   const resetMonth = () => {
     if (!confirm("Alle Einträge dieses Monats löschen?")) return;
+    dirty.current = true;
     setEntries(buildMonthEntries(settings.month));
   };
 
