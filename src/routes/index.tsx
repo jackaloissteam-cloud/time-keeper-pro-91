@@ -60,6 +60,7 @@ function Timesheet() {
   const [loaded, setLoaded] = useState(false);
   const [online, setOnline] = useState(true);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dirty = useRef(false);
 
   // Initial laden: Einstellungen + alle Monate
   useEffect(() => {
@@ -122,12 +123,13 @@ function Timesheet() {
           setSettings((prev) => {
             if (prev.month !== row.month) return prev;
             setEntries((current) =>
+              dirty.current ||
               JSON.stringify(current.map(({ id, ...rest }) => rest)) ===
-              JSON.stringify((row.entries ?? []).map(({ id, ...rest }) => rest))
+                JSON.stringify((row.entries ?? []).map(({ id, ...rest }) => rest))
                 ? current
                 : buildMonthEntries(row.month, row.entries ?? []),
             );
-            return { ...prev, employee: row.employee ?? "" };
+            return dirty.current ? prev : { ...prev, employee: row.employee ?? "" };
           });
         },
       )
@@ -140,12 +142,16 @@ function Timesheet() {
             overtime_rate: number;
             cap_hours: number;
           };
-          setSettings((prev) => ({
-            ...prev,
-            baseRate: Number(row.base_rate),
-            overtimeRate: Number(row.overtime_rate),
-            capHours: Number(row.cap_hours),
-          }));
+          setSettings((prev) =>
+            dirty.current
+              ? prev
+              : {
+                  ...prev,
+                  baseRate: Number(row.base_rate),
+                  overtimeRate: Number(row.overtime_rate),
+                  capHours: Number(row.cap_hours),
+                },
+          );
         },
       )
       .subscribe();
@@ -154,30 +160,41 @@ function Timesheet() {
     };
   }, []);
 
-  // Änderungen verzögert online speichern
+  // Änderungen verzögert online speichern (nur nach echten Eingaben)
   useEffect(() => {
-    if (!loaded || !online) return;
+    if (!loaded || !online || !dirty.current) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
+      dirty.current = false;
       const { error: mErr } = await supabase.from("timesheet_months").upsert({
         month: settings.month,
         employee: settings.employee,
         entries,
         updated_at: new Date().toISOString(),
       });
-      const { error: sErr } = await supabase.from("timesheet_settings").upsert({
-        id: 1,
-        base_rate: settings.baseRate,
-        overtime_rate: settings.overtimeRate,
-        cap_hours: settings.capHours,
-        updated_at: new Date().toISOString(),
-      });
-      if (mErr || sErr) toast.error("Speichern fehlgeschlagen – bitte Verbindung prüfen.");
+      const { error: sErr } = await supabase
+        .from("timesheet_settings")
+        .update({
+          base_rate: settings.baseRate,
+          overtime_rate: settings.overtimeRate,
+          cap_hours: settings.capHours,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", 1);
+      if (mErr || sErr) {
+        dirty.current = true;
+        toast.error("Speichern fehlgeschlagen – bitte Verbindung prüfen.");
+      }
     }, 800);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, [settings, entries, loaded, online]);
+
+  const changeSettings = (patch: Partial<Settings>) => {
+    dirty.current = true;
+    setSettings((prev) => ({ ...prev, ...patch }));
+  };
 
   const savedMonths = useMemo(() => {
     const keys = new Set(
@@ -191,6 +208,16 @@ function Timesheet() {
 
   const setMonth = (month: string) => {
     if (!month || month === settings.month) return;
+    // Ungespeicherte Eingaben des bisherigen Monats sofort sichern
+    if (dirty.current && online) {
+      supabase.from("timesheet_months").upsert({
+        month: settings.month,
+        employee: settings.employee,
+        entries,
+        updated_at: new Date().toISOString(),
+      });
+    }
+    dirty.current = false; // Monatswechsel selbst ist keine Eingabe
     setMonths((prev) => ({
       ...prev,
       [settings.month]: { month: settings.month, employee: settings.employee, entries },
@@ -202,11 +229,14 @@ function Timesheet() {
   const totals = useMemo(() => calcTotals(entries, settings), [entries, settings]);
   const overCap = totals.totalHours > settings.capHours;
 
-  const update = (id: string, patch: Partial<Entry>) =>
+  const update = (id: string, patch: Partial<Entry>) => {
+    dirty.current = true;
     setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+  };
 
   const resetMonth = () => {
     if (!confirm("Alle Einträge dieses Monats löschen?")) return;
+    dirty.current = true;
     setEntries(buildMonthEntries(settings.month));
   };
 
@@ -276,7 +306,7 @@ function Timesheet() {
         <Field label="Mitarbeiter (optional)">
           <Input
             value={settings.employee}
-            onChange={(e) => setSettings({ ...settings, employee: e.target.value })}
+            onChange={(e) => changeSettings({ employee: e.target.value })}
           />
         </Field>
         <Field label="Monat">
@@ -308,7 +338,7 @@ function Timesheet() {
             type="number"
             step="0.01"
             value={settings.baseRate}
-            onChange={(e) => setSettings({ ...settings, baseRate: Number(e.target.value) })}
+            onChange={(e) => changeSettings({ baseRate: Number(e.target.value) })}
           />
         </Field>
         <Field label="Überstunden-Satz (€/Std.)">
@@ -316,7 +346,7 @@ function Timesheet() {
             type="number"
             step="0.01"
             value={settings.overtimeRate}
-            onChange={(e) => setSettings({ ...settings, overtimeRate: Number(e.target.value) })}
+            onChange={(e) => changeSettings({ overtimeRate: Number(e.target.value) })}
           />
         </Field>
         <Field label="Kappungsgrenze (Std.)">
@@ -324,7 +354,7 @@ function Timesheet() {
             type="number"
             step="0.25"
             value={settings.capHours}
-            onChange={(e) => setSettings({ ...settings, capHours: Number(e.target.value) })}
+            onChange={(e) => changeSettings({ capHours: Number(e.target.value) })}
           />
         </Field>
       </section>
