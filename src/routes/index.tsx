@@ -167,10 +167,8 @@ function Timesheet() {
             weitere Stunde zu {formatEuro(settings.overtimeRate)}/Std.
           </p>
           <p className="no-print mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
-            <Cloud className="size-3.5" />
-            {online
-              ? "Geteilt – alle mit dem Link sehen und bearbeiten denselben Zettel."
-              : "Offline – Online-Speicher nicht erreichbar."}
+            <Laptop className="size-3.5" />
+            Nur auf diesem Gerät gespeichert – keine Daten werden geteilt.
           </p>
         </div>
         <div className="no-print flex flex-wrap gap-2">
@@ -387,9 +385,8 @@ function Timesheet() {
       </section>
 
       <p className="mt-6 text-xs text-muted-foreground">
-        Eingaben werden automatisch online gespeichert und mit allen geteilt, die den Link öffnen –
-        Änderungen erscheinen in Echtzeit. Schichten über Mitternacht (z. B. 22:00 – 05:00) werden
-        korrekt berechnet.
+        Eingaben werden automatisch nur in diesem Browser gespeichert – nichts wird geteilt.
+        Schichten über Mitternacht (z. B. 22:00 – 05:00) werden korrekt berechnet.
       </p>
     </main>
   );
