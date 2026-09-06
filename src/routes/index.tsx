@@ -167,10 +167,8 @@ function Timesheet() {
             weitere Stunde zu {formatEuro(settings.overtimeRate)}/Std.
           </p>
           <p className="no-print mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
-            <Cloud className="size-3.5" />
-            {online
-              ? "Geteilt – alle mit dem Link sehen und bearbeiten denselben Zettel."
-              : "Offline – Online-Speicher nicht erreichbar."}
+            <Laptop className="size-3.5" />
+            Nur auf diesem Gerät gespeichert – keine Daten werden geteilt.
           </p>
         </div>
         <div className="no-print flex flex-wrap gap-2">
