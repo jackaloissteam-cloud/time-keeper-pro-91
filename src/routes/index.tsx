@@ -385,9 +385,8 @@ function Timesheet() {
       </section>
 
       <p className="mt-6 text-xs text-muted-foreground">
-        Eingaben werden automatisch online gespeichert und mit allen geteilt, die den Link öffnen –
-        Änderungen erscheinen in Echtzeit. Schichten über Mitternacht (z. B. 22:00 – 05:00) werden
-        korrekt berechnet.
+        Eingaben werden automatisch nur in diesem Browser gespeichert – nichts wird geteilt.
+        Schichten über Mitternacht (z. B. 22:00 – 05:00) werden korrekt berechnet.
       </p>
     </main>
   );
