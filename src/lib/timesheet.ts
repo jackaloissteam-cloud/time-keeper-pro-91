@@ -174,8 +174,8 @@ export function parseTimeRange(value: string): { start: string; end: string } | 
     .map((s) => s.trim())
     .filter(Boolean);
   if (parts.length !== 2) return null;
-  const start = norm(parts[0]);
-  const end = norm(parts[1]);
+  const start = norm(parts[0] ?? "");
+  const end = norm(parts[1] ?? "");
   if (!start || !end) return null;
   return { start, end };
 }
