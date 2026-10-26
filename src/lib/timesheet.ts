@@ -164,7 +164,7 @@ export function parseTimeRange(value: string): { start: string; end: string } | 
   const norm = (t: string): string | null => {
     const m = t.replace(/[.,]/g, ":").match(/^(\d{1,2})(?::?(\d{2}))?$/);
     if (!m) return null;
-    const h = Number(m[1]);
+    const h = Number(m[1] ?? "");
     const min = m[2] ? Number(m[2]) : 0;
     if (h > 24 || min > 59) return null;
     return `${String(h % 24).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
