@@ -457,6 +457,52 @@ function Timesheet() {
   );
 }
 
+/** Ein einziges Zeitfeld fürs Handy: „7-15“, „7:30-15:00“ usw. werden zu Beginn/Ende. */
+function TimeRangeInput({
+  entry,
+  onCommit,
+}: {
+  entry: Entry;
+  onCommit: (start: string, end: string) => void;
+}) {
+  const [draft, setDraft] = useState(() => formatTimeRange(entry));
+
+  useEffect(() => {
+    setDraft(formatTimeRange(entry));
+  }, [entry.start, entry.end]);
+
+  const commit = () => {
+    if (!draft.trim()) {
+      if (entry.start || entry.end) onCommit("", "");
+      return;
+    }
+    const parsed = parseTimeRange(draft);
+    if (parsed) {
+      onCommit(parsed.start, parsed.end);
+    } else {
+      setDraft(formatTimeRange(entry));
+    }
+  };
+
+  return (
+    <Input
+      value={draft}
+      inputMode="numeric"
+      placeholder="Zeit, z. B. 7-15"
+      aria-label={`Arbeitszeit ${dayLabel(entry.date)}`}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          commit();
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+      className="h-9"
+    />
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
