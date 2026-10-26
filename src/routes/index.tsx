@@ -17,6 +17,8 @@ import {
   formatHours,
   formatMonth,
   isWeekend,
+  formatTimeRange,
+  parseTimeRange,
   toCsv,
   downloadXlsx,
   downloadPdf,
@@ -256,7 +258,70 @@ function Timesheet() {
         </Field>
       </section>
 
-      <section className="mt-6 overflow-x-auto rounded-lg border border-border bg-card shadow-[var(--shadow-sheet)]">
+      {/* Kompakte Kartenansicht fürs Handy: ein Zeitfeld statt zwei */}
+      <section className="mt-4 space-y-2 md:hidden">
+        {entries.map((entry) => {
+          const hours = entryHours(entry);
+          const weekend = isWeekend(entry.date);
+          const filled = Boolean(entry.start || entry.end || entry.note || entry.breakMinutes);
+          return (
+            <div
+              key={entry.id}
+              className={`rounded-lg border border-border p-3 shadow-[var(--shadow-raise)] ${
+                weekend ? "bg-muted/70" : "bg-card"
+              }`}
+            >
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                <span className="tabular text-sm font-semibold">{dayLabel(entry.date)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="tabular text-sm font-medium">
+                    {hours === null ? "–" : `${formatHours(hours)} Std.`}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={!filled}
+                    onClick={() =>
+                      update(entry.id, { start: "", end: "", breakMinutes: 0, note: "" })
+                    }
+                    title={`Eintrag ${dayLabel(entry.date)} löschen`}
+                    aria-label={`Eintrag ${dayLabel(entry.date)} löschen`}
+                    className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-25 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                <TimeRangeInput
+                  entry={entry}
+                  onCommit={(start, end) => update(entry.id, { start, end })}
+                />
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  Pause
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    value={entry.breakMinutes ? String(entry.breakMinutes) : ""}
+                    placeholder="0"
+                    onChange={(e) =>
+                      update(entry.id, { breakMinutes: Number(e.target.value) || 0 })
+                    }
+                    className="h-9 w-16 px-2 text-center"
+                  />
+                </label>
+              </div>
+              <Input
+                value={entry.note}
+                onChange={(e) => update(entry.id, { note: e.target.value })}
+                placeholder="Tour / Bemerkung"
+                className="mt-2 h-9"
+              />
+            </div>
+          );
+        })}
+      </section>
+
+      <section className="mt-6 hidden overflow-x-auto rounded-lg border border-border bg-card shadow-[var(--shadow-sheet)] md:block">
         <table className="w-full min-w-[860px] border-collapse text-sm">
           <thead>
             <tr className="bg-primary text-primary-foreground">
