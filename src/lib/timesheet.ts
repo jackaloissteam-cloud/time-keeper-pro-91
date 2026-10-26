@@ -150,6 +150,36 @@ export function isWeekend(date: string): boolean {
   return d.getDay() === 0 || d.getDay() === 6;
 }
 
+/** Zeitraum als Text, z. B. "07:00–15:00" (für das mobile Ein-Zeilen-Feld). */
+export function formatTimeRange(entry: Entry): string {
+  if (!entry.start && !entry.end) return "";
+  return `${entry.start || "…"}–${entry.end || "…"}`;
+}
+
+/**
+ * Liest einen Zeitraum aus Freitext: "7-15", "7:30-15", "07:00 – 15:00",
+ * "700-1500", "7 bis 15". Gibt null zurück, wenn nichts Eindeutiges erkannt wird.
+ */
+export function parseTimeRange(value: string): { start: string; end: string } | null {
+  const norm = (t: string): string | null => {
+    const m = t.replace(/[.,]/g, ":").match(/^(\d{1,2})(?::?(\d{2}))?$/);
+    if (!m) return null;
+    const h = Number(m[1]);
+    const min = m[2] ? Number(m[2]) : 0;
+    if (h > 24 || min > 59) return null;
+    return `${String(h % 24).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+  };
+  const parts = value
+    .split(/[-–—]|\bbis\b/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length !== 2) return null;
+  const start = norm(parts[0]);
+  const end = norm(parts[1]);
+  if (!start || !end) return null;
+  return { start, end };
+}
+
 /** Erzeugt eine Excel-Datei (.xlsx) des aktuellen Monats und lädt sie herunter. */
 export async function downloadXlsx(entries: Entry[], settings: Settings, totals: Totals) {
   const XLSX = await import("xlsx");
