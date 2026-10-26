@@ -150,6 +150,36 @@ export function isWeekend(date: string): boolean {
   return d.getDay() === 0 || d.getDay() === 6;
 }
 
+/** Zeitraum als Text, z. B. "07:00–15:00" (für das mobile Ein-Zeilen-Feld). */
+export function formatTimeRange(entry: Entry): string {
+  if (!entry.start && !entry.end) return "";
+  return `${entry.start || "…"}–${entry.end || "…"}`;
+}
+
+/**
+ * Liest einen Zeitraum aus Freitext: "7-15", "7:30-15", "07:00 – 15:00",
+ * "700-1500", "7 bis 15". Gibt null zurück, wenn nichts Eindeutiges erkannt wird.
+ */
+export function parseTimeRange(value: string): { start: string; end: string } | null {
+  const norm = (t: string): string | null => {
+    const m = t.replace(/[.,]/g, ":").match(/^(\d{1,2})(?::?(\d{2}))?$/);
+    if (!m) return null;
+    const h = Number(m[1] ?? "");
+    const min = m[2] ? Number(m[2]) : 0;
+    if (h > 24 || min > 59) return null;
+    return `${String(h % 24).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+  };
+  const parts = value
+    .split(/[-–—]|\bbis\b/i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length !== 2) return null;
+  const start = norm(parts[0] ?? "");
+  const end = norm(parts[1] ?? "");
+  if (!start || !end) return null;
+  return { start, end };
+}
+
 /** Erzeugt eine Excel-Datei (.xlsx) des aktuellen Monats und lädt sie herunter. */
 export async function downloadXlsx(entries: Entry[], settings: Settings, totals: Totals) {
   const XLSX = await import("xlsx");
@@ -184,24 +214,24 @@ export async function downloadXlsx(entries: Entry[], settings: Settings, totals:
   XLSX.writeFile(wb, `Stundenzettel_${settings.month}.xlsx`);
 }
 
-/** Erzeugt ein A4-PDF (Hochformat) des gesamten Monats und lädt es herunter. */
+/** Erzeugt ein kompaktes A4-PDF (Hochformat, eine Seite) des gesamten Monats. */
 export async function downloadPdf(entries: Entry[], settings: Settings, totals: Totals) {
   const { jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-  doc.setFontSize(16);
-  doc.text("Stundenzettel", 14, 16);
-  doc.setFontSize(11);
-  doc.text(formatMonth(settings.month), 14, 23);
-  if (settings.employee) doc.text(`Mitarbeiter: ${settings.employee}`, 14, 29);
+  doc.setFontSize(15);
+  doc.text(`Stundenzettel – ${formatMonth(settings.month)}`, 14, 14);
+  if (settings.employee) {
+    doc.setFontSize(10);
+    doc.text(`Mitarbeiter: ${settings.employee}`, 14, 20);
+  }
 
-  const head = [["Datum", "Beginn", "Ende", "Pause (Min)", "Stunden", "Tour / Bemerkung"]];
   const body = entries.map((e) => {
     const h = entryHours(e);
     return [
-      formatDate(e.date),
+      dayLabel(e.date),
       e.start || "",
       e.end || "",
       e.breakMinutes ? String(e.breakMinutes) : "",
@@ -211,23 +241,31 @@ export async function downloadPdf(entries: Entry[], settings: Settings, totals: 
   });
 
   autoTable(doc, {
-    head,
+    head: [["Datum", "Beginn", "Ende", "Pause", "Std.", "Tour / Bemerkung"]],
     body,
-    startY: settings.employee ? 33 : 27,
-    styles: { fontSize: 8, cellPadding: 1.4 },
-    headStyles: { fillColor: [31, 63, 110], textColor: 255, fontSize: 8 },
+    startY: settings.employee ? 24 : 19,
+    styles: { fontSize: 7.5, cellPadding: 0.9, lineColor: [210, 210, 210], lineWidth: 0.1 },
+    headStyles: { fillColor: [31, 63, 110], textColor: 255, fontSize: 7.5 },
+    alternateRowStyles: { fillColor: [246, 247, 249] },
     columnStyles: {
-      0: { cellWidth: 30 },
-      1: { cellWidth: 18, halign: "center" },
-      2: { cellWidth: 18, halign: "center" },
-      3: { cellWidth: 22, halign: "center" },
-      4: { cellWidth: 20, halign: "right" },
+      0: { cellWidth: 20 },
+      1: { cellWidth: 16, halign: "center" },
+      2: { cellWidth: 16, halign: "center" },
+      3: { cellWidth: 14, halign: "center" },
+      4: { cellWidth: 14, halign: "right" },
       5: { cellWidth: "auto" },
     },
+    didParseCell: (data) => {
+      if (data.section === "body" && isWeekend(entries[data.row.index]?.date ?? "")) {
+        data.cell.styles.fillColor = [231, 235, 241];
+      }
+    },
     theme: "grid",
+    margin: { left: 14, right: 14 },
   });
 
-  const y = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 60) + 6;
+  const y =
+    ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 60) + 4;
 
   autoTable(doc, {
     startY: y,
@@ -245,11 +283,11 @@ export async function downloadPdf(entries: Entry[], settings: Settings, totals: 
       ],
       ["Auszahlung gesamt", formatEuro(totals.totalPay)],
     ],
-    styles: { fontSize: 9, cellPadding: 1.8 },
-    columnStyles: { 0: { cellWidth: 80 }, 1: { halign: "right", fontStyle: "bold" } },
+    styles: { fontSize: 8.5, cellPadding: 1.2 },
+    columnStyles: { 0: { cellWidth: 90 }, 1: { halign: "right", fontStyle: "bold" } },
     theme: "plain",
     margin: { left: 14 },
-    tableWidth: 120,
+    tableWidth: 130,
   });
 
   doc.save(`Stundenzettel_${settings.month}.pdf`);
