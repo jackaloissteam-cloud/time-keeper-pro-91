@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, FileSpreadsheet, FileText, Laptop, Printer, RotateCcw, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -260,6 +260,10 @@ function Timesheet() {
 
       {/* Kompakte Kartenansicht fürs Handy: ein Zeitfeld statt zwei */}
       <section className="mt-4 space-y-2 md:hidden">
+        <p className="px-1 text-xs text-muted-foreground">
+          Zeit eintippen wie 7-15 oder 7:30-15. Keine Bindestrich-Taste? Einfach das „–“ rechts
+          antippen.
+        </p>
         {entries.map((entry) => {
           const hours = entryHours(entry);
           const weekend = isWeekend(entry.date);
@@ -466,17 +470,18 @@ function TimeRangeInput({
   onCommit: (start: string, end: string) => void;
 }) {
   const [draft, setDraft] = useState(() => formatTimeRange(entry));
+  const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setDraft(formatTimeRange(entry));
   }, [entry.start, entry.end]);
 
-  const commit = () => {
-    if (!draft.trim()) {
+  const commit = (value: string = draft) => {
+    if (!value.trim()) {
       if (entry.start || entry.end) onCommit("", "");
       return;
     }
-    const parsed = parseTimeRange(draft);
+    const parsed = parseTimeRange(value);
     if (parsed) {
       onCommit(parsed.start, parsed.end);
     } else {
@@ -484,22 +489,60 @@ function TimeRangeInput({
     }
   };
 
+  // Handy-Tastaturen haben oft kein "-": dieses Feld fügt das Trennzeichen ein.
+  const addSeparator = () => {
+    const el = ref.current;
+    const value = el?.value ?? draft;
+    if (!value.trim() || hasTimeSeparator(value)) {
+      el?.focus();
+      return;
+    }
+    const at = el?.selectionStart ?? value.length;
+    setDraft(`${value.slice(0, at)}-${value.slice(at)}`);
+    requestAnimationFrame(() => {
+      const node = ref.current;
+      if (!node) return;
+      node.focus();
+      node.setSelectionRange(at + 1, at + 1);
+    });
+  };
+
   return (
-    <Input
-      value={draft}
-      inputMode="numeric"
-      placeholder="Zeit, z. B. 7-15"
-      aria-label={`Arbeitszeit ${dayLabel(entry.date)}`}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          commit();
-          (e.target as HTMLInputElement).blur();
-        }
-      }}
-      className="h-9"
-    />
+    <div className="flex min-w-0 items-center gap-1.5">
+      <Input
+        ref={ref}
+        value={draft}
+        inputMode="numeric"
+        placeholder="Zeit, z. B. 7-15"
+        aria-label={`Arbeitszeit ${dayLabel(entry.date)}`}
+        onChange={(e) => {
+          const value = e.target.value;
+          setDraft(value);
+          // Ist das Zeitpaar vollständig, Stunden sofort anzeigen.
+          if (isCompleteTimeRange(value)) {
+            const parsed = parseTimeRange(value);
+            if (parsed) onCommit(parsed.start, parsed.end);
+          }
+        }}
+        onBlur={() => commit()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            commit();
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        className="h-9 min-w-0"
+      />
+      <button
+        type="button"
+        onClick={addSeparator}
+        title="Trennzeichen einfügen"
+        aria-label={`Trennzeichen für Arbeitszeit ${dayLabel(entry.date)} einfügen`}
+        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-input bg-background text-lg font-semibold leading-none text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground"
+      >
+        –
+      </button>
+    </div>
   );
 }
 
