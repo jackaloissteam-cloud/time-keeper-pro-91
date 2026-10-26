@@ -16,6 +16,8 @@ import {
   formatEuro,
   formatHours,
   formatMonth,
+  hasTimeSeparator,
+  isCompleteTimeRange,
   isWeekend,
   formatTimeRange,
   parseTimeRange,
