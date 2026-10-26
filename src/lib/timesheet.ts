@@ -156,9 +156,31 @@ export function formatTimeRange(entry: Entry): string {
   return `${entry.start || "…"}–${entry.end || "…"}`;
 }
 
+/** Trennzeichen zwischen Beginn und Ende, z. B. "-", "–" oder "bis". */
+const SEPARATOR = /[-–—]|\bbis\b/i;
+
+/** True, wenn der Text schon ein Trennzeichen enthält. */
+export function hasTimeSeparator(value: string): boolean {
+  return SEPARATOR.test(value);
+}
+
+/** True, wenn nach dem Trennzeichen genug Ziffern für eine vollständige Zeit stehen. */
+export function isCompleteTimeRange(value: string): boolean {
+  if (!hasTimeSeparator(value)) return false;
+  const parts = value
+    .split(SEPARATOR)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length !== 2) return false;
+  const tail = parts[1] ?? "";
+  return (tail.match(/\d/g) ?? []).length >= 2;
+}
+
 /**
  * Liest einen Zeitraum aus Freitext: "7-15", "7:30-15", "07:00 – 15:00",
- * "700-1500", "7 bis 15". Gibt null zurück, wenn nichts Eindeutiges erkannt wird.
+ * "700-1500", "7 bis 15". Ohne Trennzeichen (Handy-Tastatur hat oft keins)
+ * wird nur geraten, wenn genau eine Lesart möglich ist: "73015" → 07:30–15:00.
+ * Sonst null.
  */
 export function parseTimeRange(value: string): { start: string; end: string } | null {
   const norm = (t: string): string | null => {
@@ -169,15 +191,31 @@ export function parseTimeRange(value: string): { start: string; end: string } | 
     if (h > 24 || min > 59) return null;
     return `${String(h % 24).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
   };
-  const parts = value
-    .split(/[-–—]|\bbis\b/i)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (parts.length !== 2) return null;
-  const start = norm(parts[0] ?? "");
-  const end = norm(parts[1] ?? "");
-  if (!start || !end) return null;
-  return { start, end };
+
+  const text = value.trim();
+  if (!text) return null;
+
+  if (SEPARATOR.test(text)) {
+    const parts = text
+      .split(SEPARATOR)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length !== 2) return null;
+    const start = norm(parts[0] ?? "");
+    const end = norm(parts[1] ?? "");
+    if (!start || !end) return null;
+    return { start, end };
+  }
+
+  const digits = text.replace(/\D/g, "");
+  if (digits.length < 3 || digits.length > 6) return null;
+  const options: { start: string; end: string }[] = [];
+  for (let i = 1; i < digits.length; i++) {
+    const start = norm(digits.slice(0, i) ?? "");
+    const end = norm(digits.slice(i) ?? "");
+    if (start && end) options.push({ start, end });
+  }
+  return options.length === 1 ? (options[0] ?? null) : null;
 }
 
 /** Erzeugt eine Excel-Datei (.xlsx) des aktuellen Monats und lädt sie herunter. */
