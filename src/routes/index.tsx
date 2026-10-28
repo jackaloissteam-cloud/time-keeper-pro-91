@@ -473,6 +473,7 @@ function TimeRangeInput({
 }) {
   const [draft, setDraft] = useState(() => formatTimeRange(entry));
   const ref = useRef<HTMLInputElement>(null);
+  const separatorRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setDraft(formatTimeRange(entry));
@@ -526,7 +527,11 @@ function TimeRangeInput({
             if (parsed) onCommit(parsed.start, parsed.end);
           }
         }}
-        onBlur={() => commit()}
+        onBlur={(e) => {
+          // Beim Antippen der Trennzeichen-Taste ist die Startzeit noch unvollständig.
+          if (e.relatedTarget === separatorRef.current) return;
+          commit(e.currentTarget.value);
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             commit();
@@ -535,15 +540,19 @@ function TimeRangeInput({
         }}
         className="h-9 min-w-0"
       />
-      <button
+      <Button
+        ref={separatorRef}
         type="button"
+        variant="outline"
+        size="icon"
+        onPointerDown={(e) => e.preventDefault()}
         onClick={addSeparator}
         title="Trennzeichen einfügen"
         aria-label={`Trennzeichen für Arbeitszeit ${dayLabel(entry.date)} einfügen`}
         className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-input bg-background text-lg font-semibold leading-none text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground"
       >
         –
-      </button>
+      </Button>
     </div>
   );
 }

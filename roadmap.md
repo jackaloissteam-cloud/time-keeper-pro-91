@@ -5,3 +5,4 @@
 - [x] Excel-Export prüfen (41 Zeilen, alle Tage, Summen korrekt)
 - [x] Pulldown „Gespeicherte Monate" prüfen (Wechsel Sep↔Okt, Daten bleiben erhalten)
 - [x] Fix: Android-Zeiteingabe (onInput/onBlur ergänzt, change-Event wird übernommen)
+- [x] Handy: „–“-Taste ohne Verlust der Startzeit, Berechnung und lokales Wiederladen prüfen
