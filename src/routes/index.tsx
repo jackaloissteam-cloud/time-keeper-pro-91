@@ -293,6 +293,56 @@ function Timesheet() {
         </Field>
       </section>
 
+      <section className="no-print mt-4 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-raise)]">
+        <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Stundenzettel suchen
+        </Label>
+        <div className="relative mt-1.5">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Monat, Jahr, Mitarbeiter oder Bemerkung, z. B. „September“ oder „HU FED“"
+            aria-label="Gespeicherte Stundenzettel durchsuchen"
+            className="pl-9"
+          />
+        </div>
+        {search.trim() && (
+          <div className="mt-2 divide-y divide-border rounded-md border border-border">
+            {searchResults.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-muted-foreground">
+                Kein gespeicherter Stundenzettel gefunden.
+              </p>
+            ) : (
+              searchResults.map((r) => (
+                <button
+                  key={r.month}
+                  type="button"
+                  onClick={() => {
+                    setMonth(r.month);
+                    setSearch("");
+                  }}
+                  className="flex w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
+                >
+                  <span className="font-medium">
+                    {formatMonth(r.month)}
+                    {r.employee ? ` – ${r.employee}` : ""}
+                  </span>
+                  <span className="tabular text-muted-foreground">
+                    {formatHours(r.hours)} Std.
+                  </span>
+                  {r.matchingNotes.length > 0 && (
+                    <span className="w-full truncate text-xs text-muted-foreground">
+                      {r.matchingNotes.slice(0, 2).join(" · ")}
+                    </span>
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </section>
+
       {/* Kompakte Kartenansicht fürs Handy: ein Zeitfeld statt zwei */}
       <section className="mt-4 space-y-2 md:hidden">
         <p className="px-1 text-xs text-muted-foreground">
