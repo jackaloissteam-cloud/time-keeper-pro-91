@@ -63,6 +63,7 @@ function Timesheet() {
   const [months, setMonths] = useState<MonthMap>({});
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [search, setSearch] = useState("");
 
   // Nur lokal laden – keine Daten verlassen dieses Gerät
   useEffect(() => {
