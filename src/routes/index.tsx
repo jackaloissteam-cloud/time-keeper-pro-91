@@ -121,6 +121,38 @@ function Timesheet() {
     return Array.from(keys).sort().reverse();
   }, [months, entries, settings.month, settings.employee]);
 
+  // Suche über alle gespeicherten Monate: Monatsname, Jahr, Mitarbeiter oder Bemerkung
+  const searchResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    const all: MonthMap = {
+      ...months,
+      [settings.month]: { month: settings.month, employee: settings.employee, entries },
+    };
+    return Object.values(all)
+      .filter((m) => hasData(m.entries) || m.employee)
+      .filter((m) => {
+        const haystack = [
+          formatMonth(m.month),
+          m.month,
+          m.employee,
+          ...m.entries.map((e) => e.note),
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(q);
+      })
+      .map((m) => ({
+        month: m.month,
+        employee: m.employee,
+        hours: calcTotals(m.entries, settings).totalHours,
+        matchingNotes: m.entries
+          .filter((e) => e.note.toLowerCase().includes(q))
+          .map((e) => `${dayLabel(e.date)}: ${e.note}`),
+      }))
+      .sort((a, b) => b.month.localeCompare(a.month));
+  }, [search, months, entries, settings]);
+
   const setMonth = (month: string) => {
     if (!month || month === settings.month) return;
     setMonths((prev) => ({
