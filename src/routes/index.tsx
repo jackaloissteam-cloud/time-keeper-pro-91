@@ -58,12 +58,58 @@ function hasData(entries: Entry[] = []) {
   return entries.some((e) => e.start || e.end || e.note || e.breakMinutes);
 }
 
+/**
+ * Suchtext vereinheitlichen, damit Umlaute und Akzente keine Rolle spielen:
+ * „März“ wird als „marz“ und „maerz“ gefunden – egal, ob die Tastatur
+ * (iOS, Android, Windows) Umlaute anbietet oder nicht.
+ */
+function normVariants(value: string): string[] {
+  const lower = value.toLowerCase();
+  const plain = lower.normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const digraph = lower
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss");
+  return plain === digraph ? [plain] : [plain, digraph];
+}
+
+function textMatches(haystack: string, query: string): boolean {
+  const hays = normVariants(haystack);
+  return normVariants(query).some((q) => hays.some((h) => h.includes(q)));
+}
+
 function Timesheet() {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [months, setMonths] = useState<MonthMap>({});
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [search, setSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Windows/Desktop: Strg+K oder „/“ springt in die Suche, Escape leert sie
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      const target = ev.target as HTMLElement | null;
+      const typing =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable;
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k") {
+        ev.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+      } else if (ev.key === "/" && !typing) {
+        ev.preventDefault();
+        searchRef.current?.focus();
+      } else if (ev.key === "Escape" && target === searchRef.current) {
+        setSearch("");
+        searchRef.current?.blur();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Nur lokal laden – keine Daten verlassen dieses Gerät
   useEffect(() => {
@@ -122,8 +168,9 @@ function Timesheet() {
   }, [months, entries, settings.month, settings.employee]);
 
   // Suche über alle gespeicherten Monate: Monatsname, Jahr, Mitarbeiter oder Bemerkung
+  // (umlaut-tolerant, damit sie auf jeder Tastatur funktioniert)
   const searchResults = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     if (!q) return [];
     const all: MonthMap = {
       ...months,
@@ -137,17 +184,15 @@ function Timesheet() {
           m.month,
           m.employee,
           ...m.entries.map((e) => e.note),
-        ]
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(q);
+        ].join(" ");
+        return textMatches(haystack, q);
       })
       .map((m) => ({
         month: m.month,
         employee: m.employee,
         hours: calcTotals(m.entries, settings).totalHours,
         matchingNotes: m.entries
-          .filter((e) => e.note.toLowerCase().includes(q))
+          .filter((e) => textMatches(e.note, q))
           .map((e) => `${dayLabel(e.date)}: ${e.note}`),
       }))
       .sort((a, b) => b.month.localeCompare(a.month));
@@ -300,13 +345,36 @@ function Timesheet() {
         <div className="relative mt-1.5">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            ref={searchRef}
+            type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Monat, Jahr, Mitarbeiter oder Bemerkung, z. B. „September“ oder „HU FED“"
             aria-label="Gespeicherte Stundenzettel durchsuchen"
-            className="pl-9"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            enterKeyHint="search"
+            className="pl-9 pr-9 text-base md:text-sm [&::-webkit-search-cancel-button]:hidden"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                searchRef.current?.focus();
+              }}
+              aria-label="Suche löschen"
+              className="absolute right-1.5 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X className="size-4" />
+            </button>
+          )}
         </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Umlaute sind egal („Marz“ findet „März“). Am PC: Strg+K oder „/“ springt in die Suche.
+        </p>
         {search.trim() && (
           <div className="mt-2 divide-y divide-border rounded-md border border-border">
             {searchResults.length === 0 ? (
@@ -322,7 +390,7 @@ function Timesheet() {
                     setMonth(r.month);
                     setSearch("");
                   }}
-                  className="flex w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
+                  className="flex w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted active:bg-muted"
                 >
                   <span className="font-medium">
                     {formatMonth(r.month)}
