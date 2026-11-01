@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, FileSpreadsheet, FileText, Laptop, Printer, RotateCcw, X } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Laptop, Printer, RotateCcw, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +63,7 @@ function Timesheet() {
   const [months, setMonths] = useState<MonthMap>({});
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [search, setSearch] = useState("");
 
   // Nur lokal laden – keine Daten verlassen dieses Gerät
   useEffect(() => {
@@ -119,6 +120,38 @@ function Timesheet() {
     if (hasData(entries) || settings.employee) keys.add(settings.month);
     return Array.from(keys).sort().reverse();
   }, [months, entries, settings.month, settings.employee]);
+
+  // Suche über alle gespeicherten Monate: Monatsname, Jahr, Mitarbeiter oder Bemerkung
+  const searchResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    const all: MonthMap = {
+      ...months,
+      [settings.month]: { month: settings.month, employee: settings.employee, entries },
+    };
+    return Object.values(all)
+      .filter((m) => hasData(m.entries) || m.employee)
+      .filter((m) => {
+        const haystack = [
+          formatMonth(m.month),
+          m.month,
+          m.employee,
+          ...m.entries.map((e) => e.note),
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(q);
+      })
+      .map((m) => ({
+        month: m.month,
+        employee: m.employee,
+        hours: calcTotals(m.entries, settings).totalHours,
+        matchingNotes: m.entries
+          .filter((e) => e.note.toLowerCase().includes(q))
+          .map((e) => `${dayLabel(e.date)}: ${e.note}`),
+      }))
+      .sort((a, b) => b.month.localeCompare(a.month));
+  }, [search, months, entries, settings]);
 
   const setMonth = (month: string) => {
     if (!month || month === settings.month) return;
@@ -258,6 +291,56 @@ function Timesheet() {
             onChange={(e) => changeSettings({ capHours: Number(e.target.value) })}
           />
         </Field>
+      </section>
+
+      <section className="no-print mt-4 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-raise)]">
+        <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Stundenzettel suchen
+        </Label>
+        <div className="relative mt-1.5">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Monat, Jahr, Mitarbeiter oder Bemerkung, z. B. „September“ oder „HU FED“"
+            aria-label="Gespeicherte Stundenzettel durchsuchen"
+            className="pl-9"
+          />
+        </div>
+        {search.trim() && (
+          <div className="mt-2 divide-y divide-border rounded-md border border-border">
+            {searchResults.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-muted-foreground">
+                Kein gespeicherter Stundenzettel gefunden.
+              </p>
+            ) : (
+              searchResults.map((r) => (
+                <button
+                  key={r.month}
+                  type="button"
+                  onClick={() => {
+                    setMonth(r.month);
+                    setSearch("");
+                  }}
+                  className="flex w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
+                >
+                  <span className="font-medium">
+                    {formatMonth(r.month)}
+                    {r.employee ? ` – ${r.employee}` : ""}
+                  </span>
+                  <span className="tabular text-muted-foreground">
+                    {formatHours(r.hours)} Std.
+                  </span>
+                  {r.matchingNotes.length > 0 && (
+                    <span className="w-full truncate text-xs text-muted-foreground">
+                      {r.matchingNotes.slice(0, 2).join(" · ")}
+                    </span>
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+        )}
       </section>
 
       {/* Kompakte Kartenansicht fürs Handy: ein Zeitfeld statt zwei */}
