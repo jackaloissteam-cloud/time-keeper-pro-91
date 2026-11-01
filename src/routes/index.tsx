@@ -143,8 +143,9 @@ function Timesheet() {
   }, [months, entries, settings.month, settings.employee]);
 
   // Suche über alle gespeicherten Monate: Monatsname, Jahr, Mitarbeiter oder Bemerkung
+  // (umlaut-tolerant, damit sie auf jeder Tastatur funktioniert)
   const searchResults = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     if (!q) return [];
     const all: MonthMap = {
       ...months,
@@ -158,17 +159,15 @@ function Timesheet() {
           m.month,
           m.employee,
           ...m.entries.map((e) => e.note),
-        ]
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(q);
+        ].join(" ");
+        return textMatches(haystack, q);
       })
       .map((m) => ({
         month: m.month,
         employee: m.employee,
         hours: calcTotals(m.entries, settings).totalHours,
         matchingNotes: m.entries
-          .filter((e) => e.note.toLowerCase().includes(q))
+          .filter((e) => textMatches(e.note, q))
           .map((e) => `${dayLabel(e.date)}: ${e.note}`),
       }))
       .sort((a, b) => b.month.localeCompare(a.month));
