@@ -58,6 +58,27 @@ function hasData(entries: Entry[] = []) {
   return entries.some((e) => e.start || e.end || e.note || e.breakMinutes);
 }
 
+/**
+ * Suchtext vereinheitlichen, damit Umlaute und Akzente keine Rolle spielen:
+ * „März“ wird als „marz“ und „maerz“ gefunden – egal, ob die Tastatur
+ * (iOS, Android, Windows) Umlaute anbietet oder nicht.
+ */
+function normVariants(value: string): string[] {
+  const lower = value.toLowerCase();
+  const plain = lower.normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const digraph = lower
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss");
+  return plain === digraph ? [plain] : [plain, digraph];
+}
+
+function textMatches(haystack: string, query: string): boolean {
+  const hays = normVariants(haystack);
+  return normVariants(query).some((q) => hays.some((h) => h.includes(q)));
+}
+
 function Timesheet() {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [months, setMonths] = useState<MonthMap>({});
