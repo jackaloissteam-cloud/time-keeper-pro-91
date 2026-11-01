@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, FileSpreadsheet, FileText, Laptop, Printer, RotateCcw, X } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Laptop, Printer, RotateCcw, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
