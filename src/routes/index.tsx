@@ -85,6 +85,31 @@ function Timesheet() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [search, setSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Windows/Desktop: Strg+K oder „/“ springt in die Suche, Escape leert sie
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      const target = ev.target as HTMLElement | null;
+      const typing =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable;
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k") {
+        ev.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+      } else if (ev.key === "/" && !typing) {
+        ev.preventDefault();
+        searchRef.current?.focus();
+      } else if (ev.key === "Escape" && target === searchRef.current) {
+        setSearch("");
+        searchRef.current?.blur();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Nur lokal laden – keine Daten verlassen dieses Gerät
   useEffect(() => {
