@@ -1,5 +1,9 @@
 # Roadmap
 
+- [x] Einzelne Suchanfragen und gesamten Verlauf dauerhaft löschen.
+- [x] JSON-Sicherung und Wiederherstellung fehlender Monate ohne Überschreiben vorhandener Daten.
+- [x] Speicherort bei Treffern anzeigen und Funktionen auf Handy/PC testen.
+
 - [x] September-Suche prüfen, Suchort und gespeicherte Monate anzeigen, lokalen Suchverlauf ergänzen und testen.
 
 - [x] App lokal ausführen (läuft auf http://localhost:8080)

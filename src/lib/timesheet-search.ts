@@ -14,3 +14,7 @@ export function addSearchToHistory(history: string[], query: string): string[] {
   if (!term) return history;
   return [term, ...history.filter((item) => item.toLocaleLowerCase("de-DE") !== term.toLocaleLowerCase("de-DE"))];
 }
+
+export function removeSearchFromHistory(history: string[], query: string): string[] {
+  return history.filter((term) => term !== query);
+}
