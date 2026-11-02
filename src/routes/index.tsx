@@ -314,9 +314,11 @@ function Timesheet() {
           <Button
             variant="outline"
             size="sm"
+            disabled={!loaded}
+            aria-label={`PDF für ${formatMonth(settings.month)} herunterladen`}
             onClick={() => downloadPdf(entries, settings, totals)}
           >
-            <FileText /> PDF
+            <FileText /> PDF herunterladen
           </Button>
           <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer /> Drucken
