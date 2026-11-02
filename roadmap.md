@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] PDF-Download des ausgewählten gespeicherten Stundenzettels mit Zeiten, Stunden und Vergütung prüfen.
+
 - [x] Einzelne Suchanfragen und gesamten Verlauf dauerhaft löschen.
 - [x] JSON-Sicherung und Wiederherstellung fehlender Monate ohne Überschreiben vorhandener Daten.
 - [x] Speicherort bei Treffern anzeigen und Funktionen auf Handy/PC testen.
