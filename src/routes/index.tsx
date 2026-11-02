@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Download, FileSpreadsheet, FileText, Laptop, Printer, RotateCcw, Search, X } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Laptop, Printer, RotateCcw, Search, Upload, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { addSearchToHistory, textMatches } from "@/lib/timesheet-search";
+import { addSearchToHistory, removeSearchFromHistory, textMatches } from "@/lib/timesheet-search";
+import { parseBackup, restoreMissingMonths, type MonthMap } from "@/lib/timesheet-backup";
 import {
   type Entry,
   type Settings,
@@ -52,8 +53,6 @@ export const Route = createFileRoute("/")({
 const STORAGE_KEY = "vpt-stundenzettel-v2";
 const SEARCH_HISTORY_KEY = "vpt-stundenzettel-search-history";
 
-type MonthRow = { month: string; employee: string; entries: Entry[] };
-type MonthMap = Record<string, MonthRow>;
 type Stored = { settings: Partial<Settings>; months: MonthMap };
 
 function hasData(entries: Entry[] = []) {
@@ -68,6 +67,10 @@ function Timesheet() {
   const [search, setSearch] = useState("");
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const searchRef = useRef<HTMLInputElement>(null);
+  const backupRef = useRef<HTMLInputElement>(null);
+  const [backupMessage, setBackupMessage] = useState("");
+  const [importing, setImporting] = useState(false);
+  const historyTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
   // Windows/Desktop: Strg+K oder „/“ springt in die Suche, Escape leert sie
   useEffect(() => {
@@ -122,9 +125,15 @@ function Timesheet() {
 
   useEffect(() => {
     if (!loaded || !search.trim()) return;
-    const timer = window.setTimeout(() => rememberSearch(search), 800);
-    return () => window.clearTimeout(timer);
+    historyTimer.current = window.setTimeout(() => rememberSearch(search), 800);
+    return () => { if (historyTimer.current !== null) window.clearTimeout(historyTimer.current); };
   }, [search, loaded]);
+
+  const deleteHistory = (term?: string) => {
+    if (historyTimer.current !== null) window.clearTimeout(historyTimer.current);
+    if (term === undefined || term === search.trim()) setSearch("");
+    setSearchHistory((previous) => term === undefined ? [] : removeSearchFromHistory(previous, term));
+  };
 
   useEffect(() => {
     if (!loaded) return;
@@ -232,6 +241,42 @@ function Timesheet() {
     a.download = `Stundenzettel_${settings.month}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportBackup = () => {
+    const all: MonthMap = { ...months, [settings.month]: { month: settings.month, employee: settings.employee, entries } };
+    const saved = Object.fromEntries(Object.entries(all).filter(([, row]) => hasData(row.entries) || row.employee));
+    if (!Object.keys(saved).length) { setBackupMessage("Keine ausgefüllten Stundenzettel zum Sichern vorhanden."); return; }
+    const blob = new Blob([JSON.stringify({ format: "stundenzettel-backup", version: 1, months: saved }, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Stundenzettel_Sicherung_${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setBackupMessage(`${Object.keys(saved).length} Monate als Sicherungsdatei heruntergeladen.`);
+  };
+
+  const importBackup = async (file: File) => {
+    setImporting(true);
+    setBackupMessage("");
+    try {
+      if (file.size > 10 * 1024 * 1024) throw new Error("Die Sicherungsdatei ist zu groß (maximal 10 MB).");
+      const incoming = parseBackup(await file.text());
+      const all: MonthMap = { ...months, [settings.month]: { month: settings.month, employee: settings.employee, entries } };
+      const restored = restoreMissingMonths(all, incoming);
+      // Write successfully before changing UI state: full/blocked storage must not claim a successful restore.
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, months: restored.months }));
+      setMonths(restored.months);
+      const current = restored.months[settings.month];
+      if (current) {
+        setEntries(buildMonthEntries(settings.month, current.entries));
+        setSettings((previous) => ({ ...previous, employee: current.employee }));
+      }
+      setBackupMessage(`${restored.imported} Monate wiederhergestellt. ${restored.skipped} bereits vorhandene Monate unverändert behalten.`);
+    } catch (error) {
+      setBackupMessage(error instanceof Error && error.name === "QuotaExceededError" ? "Der Browserspeicher ist voll. Es wurde nichts importiert." : error instanceof SyntaxError ? "Keine gültige JSON-Sicherungsdatei. Es wurde nichts importiert." : error instanceof Error ? error.message : "Die Sicherung konnte nicht importiert werden.");
+    } finally { setImporting(false); }
   };
 
 
@@ -389,11 +434,11 @@ function Timesheet() {
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium">Suchverlauf</span>
-          {searchHistory.length > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => setSearchHistory([])} aria-label="Suchverlauf löschen"><X className="size-4" /> Löschen</Button>}
+          {searchHistory.length > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => deleteHistory()} aria-label="Gesamten Suchverlauf leeren"><X className="size-4" /> Verlauf leeren</Button>}
         </div>
         {searchHistory.length === 0 ? <p className="mt-1 text-sm text-muted-foreground">Noch keine Suchanfragen.</p> : (
           <ul className="mt-1 flex flex-wrap gap-2" aria-label="Bisherige Suchanfragen">
-            {searchHistory.map((term) => <li key={term}><Button type="button" variant="outline" size="sm" onClick={() => { setSearch(term); rememberSearch(term); }}>{term}</Button></li>)}
+            {searchHistory.map((term) => <li key={term} className="flex max-w-full items-center gap-1"><Button type="button" variant="outline" size="sm" className="h-auto min-h-9 whitespace-normal break-words" onClick={() => { setSearch(term); rememberSearch(term); }}>{term}</Button><Button type="button" variant="ghost" size="icon" className="shrink-0" onClick={() => deleteHistory(term)} aria-label={`Suchanfrage „${term}“ löschen`} title={`Suchanfrage „${term}“ löschen`}><X className="size-4" /></Button></li>)}
           </ul>
         )}
         {search.trim() && (
@@ -424,6 +469,7 @@ function Timesheet() {
                   <span className="tabular text-muted-foreground">
                     {formatHours(r.hours)} Std.
                   </span>
+                  <span className="w-full text-xs font-normal text-muted-foreground">Speicherort: dieser Browser auf diesem Gerät</span>
                   {r.matchingNotes.length > 0 && (
                     <span className="w-full truncate text-xs text-muted-foreground">
                       {r.matchingNotes.slice(0, 2).join(" · ")}
@@ -435,6 +481,16 @@ function Timesheet() {
           </div>
           </div>
         )}
+        <div className="mt-4 border-t border-border pt-3">
+          <p className="text-sm font-medium">Sicherung &amp; Wiederherstellung</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={!loaded || importing} onClick={exportBackup}><Download /> Sicherung speichern</Button>
+            <Button type="button" variant="outline" size="sm" disabled={!loaded || importing} onClick={() => backupRef.current?.click()}><Upload /> {importing ? "Wiederherstellen …" : "Sicherung importieren"}</Button>
+            <input ref={backupRef} type="file" accept=".json,application/json" className="hidden" aria-label="Stundenzettel-Sicherungsdatei" onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (file) void importBackup(file); }} />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">JSON-Sicherungsdatei · Vorhandene ausgefüllte Monate bleiben unverändert. PDF- und Excel-Dateien sind keine Sicherungsdateien.</p>
+          {backupMessage && <p role="status" className="mt-2 text-sm">{backupMessage}</p>}
+        </div>
       </section>
 
       {/* Kompakte Kartenansicht fürs Handy: ein Zeitfeld statt zwei */}
