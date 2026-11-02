@@ -70,7 +70,7 @@ function Timesheet() {
   const backupRef = useRef<HTMLInputElement>(null);
   const [backupMessage, setBackupMessage] = useState("");
   const [importing, setImporting] = useState(false);
-  const historyTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const historyTimer = useRef<number | null>(null);
 
   // Windows/Desktop: Strg+K oder „/“ springt in die Suche, Escape leert sie
   useEffect(() => {
