@@ -5,6 +5,7 @@ import { Download, FileSpreadsheet, FileText, Laptop, Printer, RotateCcw, Search
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { addSearchToHistory, textMatches } from "@/lib/timesheet-search";
 import {
   type Entry,
   type Settings,
@@ -49,6 +50,7 @@ export const Route = createFileRoute("/")({
 });
 
 const STORAGE_KEY = "vpt-stundenzettel-v2";
+const SEARCH_HISTORY_KEY = "vpt-stundenzettel-search-history";
 
 type MonthRow = { month: string; employee: string; entries: Entry[] };
 type MonthMap = Record<string, MonthRow>;
@@ -58,33 +60,13 @@ function hasData(entries: Entry[] = []) {
   return entries.some((e) => e.start || e.end || e.note || e.breakMinutes);
 }
 
-/**
- * Suchtext vereinheitlichen, damit Umlaute und Akzente keine Rolle spielen:
- * „März“ wird als „marz“ und „maerz“ gefunden – egal, ob die Tastatur
- * (iOS, Android, Windows) Umlaute anbietet oder nicht.
- */
-function normVariants(value: string): string[] {
-  const lower = value.toLowerCase();
-  const plain = lower.normalize("NFD").replace(/[̀-ͯ]/g, "");
-  const digraph = lower
-    .replace(/ä/g, "ae")
-    .replace(/ö/g, "oe")
-    .replace(/ü/g, "ue")
-    .replace(/ß/g, "ss");
-  return plain === digraph ? [plain] : [plain, digraph];
-}
-
-function textMatches(haystack: string, query: string): boolean {
-  const hays = normVariants(haystack);
-  return normVariants(query).some((q) => hays.some((h) => h.includes(q)));
-}
-
 function Timesheet() {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [months, setMonths] = useState<MonthMap>({});
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [search, setSearch] = useState("");
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Windows/Desktop: Strg+K oder „/“ springt in die Suche, Escape leert sie
@@ -113,6 +95,10 @@ function Timesheet() {
 
   // Nur lokal laden – keine Daten verlassen dieses Gerät
   useEffect(() => {
+    try {
+      const history: unknown = JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) ?? "[]");
+      if (Array.isArray(history)) setSearchHistory(history.filter((term): term is string => typeof term === "string"));
+    } catch { /* Beschädigter Suchverlauf beeinflusst keine Monatsdaten. */ }
     let stored: Stored | null = null;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -129,6 +115,22 @@ function Timesheet() {
     setEntries(buildMonthEntries(next.month, map[next.month]?.entries ?? []));
     setLoaded(true);
   }, []);
+
+  const rememberSearch = (query: string) => {
+    setSearchHistory((previous) => addSearchToHistory(previous, query));
+  };
+
+  useEffect(() => {
+    if (!loaded || !search.trim()) return;
+    const timer = window.setTimeout(() => rememberSearch(search), 800);
+    return () => window.clearTimeout(timer);
+  }, [search, loaded]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    try { localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(searchHistory)); }
+    catch { /* Lokaler Speicher ist möglicherweise gesperrt. */ }
+  }, [searchHistory, loaded]);
 
   // Lokal speichern
   useEffect(() => {
@@ -338,17 +340,20 @@ function Timesheet() {
         </Field>
       </section>
 
-      <section className="no-print mt-4 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-raise)]">
+      <section aria-label="Stundenzettelsuche" className="no-print mt-4 border-b border-border py-4">
         <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Stundenzettel suchen
         </Label>
-        <div className="relative mt-1.5">
+        <form className="mt-1.5 flex gap-2" onSubmit={(event) => { event.preventDefault(); rememberSearch(search); }}>
+        <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={searchRef}
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onInput={(e) => setSearch(e.currentTarget.value)}
+            onBlur={() => rememberSearch(search)}
             placeholder="Monat, Jahr, Mitarbeiter oder Bemerkung, z. B. „September“ oder „HU FED“"
             aria-label="Gespeicherte Stundenzettel durchsuchen"
             autoComplete="off"
@@ -359,8 +364,10 @@ function Timesheet() {
             className="pl-9 pr-9 text-base md:text-sm [&::-webkit-search-cancel-button]:hidden"
           />
           {search && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => {
                 setSearch("");
                 searchRef.current?.focus();
@@ -369,28 +376,46 @@ function Timesheet() {
               className="absolute right-1.5 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <X className="size-4" />
-            </button>
+            </Button>
           )}
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Umlaute sind egal („Marz“ findet „März“). Am PC: Strg+K oder „/“ springt in die Suche.
+        <Button type="submit" variant="outline" aria-label="Suche ausführen"><Search className="size-4" /></Button>
+        </form>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Suchort: gespeicherte Stundenzettel in diesem Browser auf diesem Gerät. Keine Suche auf anderen Geräten oder in Dateien.
         </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {savedMonths.length ? `${savedMonths.length} gespeicherte Monate: ${savedMonths.map(formatMonth).join(" · ")}` : "In diesem Browser sind noch keine ausgefüllten Stundenzettel gespeichert."}
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium">Suchverlauf</span>
+          {searchHistory.length > 0 && <Button type="button" variant="ghost" size="sm" onClick={() => setSearchHistory([])} aria-label="Suchverlauf löschen"><X className="size-4" /> Löschen</Button>}
+        </div>
+        {searchHistory.length === 0 ? <p className="mt-1 text-sm text-muted-foreground">Noch keine Suchanfragen.</p> : (
+          <ul className="mt-1 flex flex-wrap gap-2" aria-label="Bisherige Suchanfragen">
+            {searchHistory.map((term) => <li key={term}><Button type="button" variant="outline" size="sm" onClick={() => { setSearch(term); rememberSearch(term); }}>{term}</Button></li>)}
+          </ul>
+        )}
         {search.trim() && (
-          <div className="mt-2 divide-y divide-border rounded-md border border-border">
+          <div className="mt-3" role="status" aria-live="polite" aria-atomic="true">
+          <p className="mb-2 text-sm font-medium">Suche nach „{search.trim()}“: {searchResults.length} Treffer in {savedMonths.length} gespeicherten Monaten.</p>
+          <div className="divide-y divide-border rounded-md border border-border">
             {searchResults.length === 0 ? (
               <p className="px-3 py-2 text-sm text-muted-foreground">
-                Kein gespeicherter Stundenzettel gefunden.
+                Kein gespeicherter Stundenzettel für „{search.trim()}“ in diesem Browser gefunden. Einträge aus einem anderen Browser, Gerät oder dem Live-Link sind hier nicht verfügbar.
               </p>
             ) : (
               searchResults.map((r) => (
-                <button
+                <Button
                   key={r.month}
                   type="button"
+                  variant="ghost"
                   onClick={() => {
+                    rememberSearch(search);
                     setMonth(r.month);
                     setSearch("");
                   }}
-                  className="flex w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted active:bg-muted"
+                  className="flex h-auto w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 whitespace-normal px-3 py-2.5 text-left text-sm"
                 >
                   <span className="font-medium">
                     {formatMonth(r.month)}
@@ -404,9 +429,10 @@ function Timesheet() {
                       {r.matchingNotes.slice(0, 2).join(" · ")}
                     </span>
                   )}
-                </button>
+                </Button>
               ))
             )}
+          </div>
           </div>
         )}
       </section>
