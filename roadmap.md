@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] September-Suche prüfen, Suchort und gespeicherte Monate anzeigen, lokalen Suchverlauf ergänzen und testen.
+
 - [x] App lokal ausführen (läuft auf http://localhost:8080)
 - [x] PDF-Export prüfen (1 Seite A4, Datum/Zeiten/Pause/Stunden, Gesamt 16,75 Std., Sätze 13,90/12,00 €)
 - [x] Excel-Export prüfen (41 Zeilen, alle Tage, Summen korrekt)
