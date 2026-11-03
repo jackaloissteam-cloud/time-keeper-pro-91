@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] PDF-Layout druckfreundlich überarbeiten und Monatsübersicht sowie Vergütung klar hervorheben; A4-Ausgabe visuell prüfen.
+
 - [x] PDF-Download des ausgewählten gespeicherten Stundenzettels geprüft: A4, Zeiten/Pausen, Stunden und Vergütung; Sichtprüfung ohne Layoutfehler.
 
 - [x] Einzelne Suchanfragen und gesamten Verlauf dauerhaft löschen.
