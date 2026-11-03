@@ -1,6 +1,6 @@
 # Roadmap
 
-- [ ] PDF-Download des ausgewählten gespeicherten Stundenzettels mit Zeiten, Stunden und Vergütung prüfen.
+- [x] PDF-Download des ausgewählten gespeicherten Stundenzettels geprüft: A4, Zeiten/Pausen, Stunden und Vergütung; Sichtprüfung ohne Layoutfehler.
 
 - [x] Einzelne Suchanfragen und gesamten Verlauf dauerhaft löschen.
 - [x] JSON-Sicherung und Wiederherstellung fehlender Monate ohne Überschreiben vorhandener Daten.
