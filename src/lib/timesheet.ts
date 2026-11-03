@@ -252,19 +252,42 @@ export async function downloadXlsx(entries: Entry[], settings: Settings, totals:
   XLSX.writeFile(wb, `Stundenzettel_${settings.month}.xlsx`);
 }
 
-/** Erzeugt ein kompaktes A4-PDF (Hochformat, eine Seite) des gesamten Monats. */
+/** Druckfreundliches A4-PDF; lange Bemerkungen werden ohne Abschneiden fortgesetzt. */
 export async function downloadPdf(entries: Entry[], settings: Settings, totals: Totals) {
   const { jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
 
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
-  doc.setFontSize(15);
-  doc.text(`Stundenzettel – ${formatMonth(settings.month)}`, 14, 14);
-  if (settings.employee) {
-    doc.setFontSize(10);
-    doc.text(`Mitarbeiter: ${settings.employee}`, 14, 20);
-  }
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+  // Neutral print palette: readable in monochrome, without large ink-heavy fills.
+  const ink = 30;
+  const muted = 90;
+  const rule = 190;
+  const paperTint = 245;
+  const left = 14;
+  const right = 196;
+  const month = formatMonth(settings.month);
+  doc.setProperties({ title: `Stundenzettel – ${month}`, subject: "Arbeitszeiten und monatliche Vergütungsberechnung", creator: "Stundenzettel-Rechner" });
+  const heading = () => {
+    doc.setTextColor(ink);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("Stundenzettel", left, 18);
+    doc.setFontSize(12);
+    doc.text(month, right, 18, { align: "right" });
+    doc.setDrawColor(rule);
+    doc.setLineWidth(0.25);
+    doc.line(left, 22, right, 22);
+  };
+  heading();
+  autoTable(doc, {
+    startY: 25,
+    body: [["Mitarbeiter", settings.employee || ""]],
+    theme: "plain",
+    styles: { fontSize: 9, textColor: ink, cellPadding: 1, overflow: "linebreak" },
+    columnStyles: { 0: { cellWidth: 25, textColor: muted } },
+    margin: { left, right: left },
+  });
+  const tableStart = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 32) + 4;
 
   const body = entries.map((e) => {
     const h = entryHours(e);
@@ -279,54 +302,95 @@ export async function downloadPdf(entries: Entry[], settings: Settings, totals: 
   });
 
   autoTable(doc, {
-    head: [["Datum", "Beginn", "Ende", "Pause", "Std.", "Tour / Bemerkung"]],
+    head: [["Tag", "Beginn", "Ende", "Pause (Min.)", "Stunden", "Tour / Bemerkung"]],
     body,
-    startY: settings.employee ? 24 : 19,
-    styles: { fontSize: 7.5, cellPadding: 0.9, lineColor: [210, 210, 210], lineWidth: 0.1 },
-    headStyles: { fillColor: [31, 63, 110], textColor: 255, fontSize: 7.5 },
-    alternateRowStyles: { fillColor: [246, 247, 249] },
+    startY: tableStart,
+    styles: { fontSize: 8.5, cellPadding: 1, textColor: ink, lineColor: rule, lineWidth: 0.1, overflow: "linebreak" },
+    headStyles: { fillColor: 235, textColor: ink, fontStyle: "bold", fontSize: 8 },
     columnStyles: {
       0: { cellWidth: 20 },
-      1: { cellWidth: 16, halign: "center" },
-      2: { cellWidth: 16, halign: "center" },
-      3: { cellWidth: 14, halign: "center" },
-      4: { cellWidth: 14, halign: "right" },
+      1: { cellWidth: 18, halign: "center" },
+      2: { cellWidth: 18, halign: "center" },
+      3: { cellWidth: 23, halign: "right" },
+      4: { cellWidth: 19, halign: "right" },
       5: { cellWidth: "auto" },
     },
     didParseCell: (data) => {
       if (data.section === "body" && isWeekend(entries[data.row.index]?.date ?? "")) {
-        data.cell.styles.fillColor = [231, 235, 241];
+        data.cell.styles.fillColor = paperTint;
       }
     },
     theme: "grid",
-    margin: { left: 14, right: 14 },
+    rowPageBreak: "avoid",
+    margin: { left, right: left, top: 28, bottom: 18 },
+    willDrawPage: () => { if (doc.getNumberOfPages() > 1) heading(); },
   });
 
-  const y =
-    ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 60) + 4;
+  let y = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? 60) + 5;
+  // Keep the full calculation together instead of splitting totals between pages.
+  if (y > 228) {
+    doc.addPage();
+    heading();
+    y = 30;
+  }
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("Stundenübersicht", left, y);
+  const pauseMinutes = entries.reduce((sum, entry) => sum + (entry.breakMinutes || 0), 0);
+  autoTable(doc, {
+    startY: y + 3,
+    body: [
+      ["Arbeitsstunden gesamt", "Basis-Stunden", "Überstunden", "Pausen gesamt"],
+      [`${formatHours(totals.totalHours)} Std.`, `${formatHours(totals.baseHours)} Std.`, `${formatHours(totals.overtimeHours)} Std.`, `${pauseMinutes} Min.`],
+    ],
+    theme: "plain",
+    styles: { fontSize: 8, cellPadding: 1, textColor: muted },
+    didParseCell: (data) => {
+      if (data.row.index === 1) {
+        data.cell.styles.fontSize = 11;
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.textColor = ink;
+      }
+    },
+    margin: { left, right: left },
+    tableWidth: right - left,
+  });
+  const calculationY = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 18) + 5;
+  doc.setTextColor(ink);
+  doc.setFontSize(10);
+  doc.text("Vergütungsberechnung", left, calculationY);
 
   autoTable(doc, {
-    startY: y,
+    startY: calculationY + 3,
+    head: [["Vergütung", "Stunden", "Satz / Std.", "Betrag"]],
     body: [
-      ["Gesamtstunden", `${formatHours(totals.totalHours)} Std.`],
-      [
-        `Basis-Stunden (bis ${formatHours(settings.capHours)})`,
-        `${formatHours(totals.baseHours)} Std.`,
-      ],
-      ["Überstunden", `${formatHours(totals.overtimeHours)} Std.`],
-      [`Summe Basis (${formatEuro(settings.baseRate)}/Std.)`, formatEuro(totals.basePay)],
-      [
-        `Summe Überstunden (${formatEuro(settings.overtimeRate)}/Std.)`,
-        formatEuro(totals.overtimePay),
-      ],
-      ["Auszahlung gesamt", formatEuro(totals.totalPay)],
+      [`Basis (bis ${formatHours(settings.capHours)} Std.)`, formatHours(totals.baseHours), formatEuro(settings.baseRate), formatEuro(totals.basePay)],
+      ["Überstunden", formatHours(totals.overtimeHours), formatEuro(settings.overtimeRate), formatEuro(totals.overtimePay)],
     ],
-    styles: { fontSize: 8.5, cellPadding: 1.2 },
-    columnStyles: { 0: { cellWidth: 90 }, 1: { halign: "right", fontStyle: "bold" } },
+    styles: { fontSize: 9, cellPadding: 1.2, textColor: ink },
+    headStyles: { textColor: muted, fontSize: 8, fontStyle: "normal" },
+    columnStyles: { 0: { cellWidth: 83 }, 1: { cellWidth: 27, halign: "right" }, 2: { cellWidth: 34, halign: "right" }, 3: { halign: "right", fontStyle: "bold" } },
     theme: "plain",
-    margin: { left: 14 },
-    tableWidth: 130,
+    margin: { left, right: left },
   });
-
+  const payY = ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? calculationY + 25) + 3;
+  doc.setDrawColor(ink);
+  doc.line(left, payY, right, payY);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("Auszahlung gesamt", left, payY + 7);
+  doc.setFontSize(15);
+  doc.text(formatEuro(totals.totalPay), right, payY + 7, { align: "right" });
+  const pages = doc.getNumberOfPages();
+  for (let page = 1; page <= pages; page++) {
+    doc.setPage(page);
+    doc.setDrawColor(rule);
+    doc.line(left, 282, right, 282);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(muted);
+    doc.text(month, left, 287);
+    doc.text(`Seite ${page} von ${pages}`, right, 287, { align: "right" });
+  }
   doc.save(`Stundenzettel_${settings.month}.pdf`);
 }
