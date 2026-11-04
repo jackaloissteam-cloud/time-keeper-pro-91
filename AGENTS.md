@@ -12,3 +12,4 @@
 - Keep timesheet search matching and history ordering in the browser-safe `src/lib/timesheet-search.ts` module so their behavior can be tested independently of the page.
 - Validate JSON backup files and merge only missing or empty months in `src/lib/timesheet-backup.ts` so restoration never silently overwrites populated local timesheets; backups include months, not search history, and do not change current rates.
 - Keep GitHub visibility guidance in a read-only help dialog; repository settings and published-app access are separate and must not be changed by opening help.
+- Use the native HTML dialog for GitHub help to avoid introducing a new Radix optimizer dependency into an already running preview.

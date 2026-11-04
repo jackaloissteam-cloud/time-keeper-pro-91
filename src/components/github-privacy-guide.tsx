@@ -1,23 +1,24 @@
-import { ExternalLink, Github, LockKeyhole } from "lucide-react";
+import { useRef } from "react";
+import { ExternalLink, Github, LockKeyhole, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 const repositoryUrl = "https://github.com/jackaloissteam-cloud/time-keeper-pro-91";
 const documentationUrl = "https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility";
 
 export function GithubPrivacyGuide() {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
+    <>
+        <Button type="button" variant="outline" size="sm" onClick={() => dialogRef.current?.showModal()}>
           <Github /> GitHub: privat stellen
         </Button>
-      </DialogTrigger>
-      <DialogContent className="no-print max-h-[85dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-lg p-5 sm:p-6">
-        <DialogHeader className="pr-6 text-left">
-          <DialogTitle className="flex items-center gap-2 leading-snug"><LockKeyhole className="size-5 shrink-0" /> GitHub-Repository auf privat ändern</DialogTitle>
-          <DialogDescription className="break-words">jackaloissteam-cloud / time-keeper-pro-91</DialogDescription>
-        </DialogHeader>
+      <dialog ref={dialogRef} aria-labelledby="github-guide-title" aria-describedby="github-guide-description" className="github-guide no-print fixed inset-0 m-auto max-h-[85dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-lg border border-border bg-background p-5 text-foreground shadow-[var(--shadow-sheet)] sm:p-6">
+        <div className="space-y-4">
+        <header className="relative space-y-2 pr-10 text-left">
+          <h2 id="github-guide-title" className="flex items-center gap-2 text-lg font-semibold leading-snug"><LockKeyhole className="size-5 shrink-0" /> GitHub-Repository auf privat ändern</h2>
+          <p id="github-guide-description" className="break-words text-sm text-muted-foreground">jackaloissteam-cloud / time-keeper-pro-91</p>
+          <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0" aria-label="Anleitung schließen" onClick={() => dialogRef.current?.close()}><X /></Button>
+        </header>
 
         <p className="text-sm text-muted-foreground">Diese Anleitung ändert nichts automatisch. Die Umstellung erfolgt in GitHub und betrifft den Quellcode, nicht die Sichtbarkeit der veröffentlichten App.</p>
 
@@ -56,7 +57,8 @@ export function GithubPrivacyGuide() {
           <p className="text-muted-foreground">Der aktuelle GitHub-Status wird in dieser Anleitung nicht live geprüft.</p>
           <a href={documentationUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-2 text-primary underline underline-offset-4">Offizielle GitHub-Anleitung <ExternalLink className="size-4 shrink-0" /></a>
         </section>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </dialog>
+    </>
   );
 }
