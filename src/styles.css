@@ -167,6 +167,10 @@
   font-family: var(--font-mono);
 }
 
+.github-guide::backdrop {
+  background: color-mix(in oklch, var(--foreground) 65%, transparent);
+}
+
 @layer base {
   @media print {
     @page { size: A4 portrait; margin: 8mm; }
