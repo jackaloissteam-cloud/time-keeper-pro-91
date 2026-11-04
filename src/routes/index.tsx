@@ -5,6 +5,7 @@ import { Download, FileSpreadsheet, FileText, Laptop, Printer, RotateCcw, Search
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { GithubPrivacyGuide } from "@/components/github-privacy-guide";
 import { addSearchToHistory, removeSearchFromHistory, textMatches } from "@/lib/timesheet-search";
 import { parseBackup, restoreMissingMonths, type MonthMap } from "@/lib/timesheet-backup";
 import {
@@ -301,6 +302,7 @@ function Timesheet() {
           </p>
         </div>
         <div className="no-print flex flex-wrap gap-2">
+          <GithubPrivacyGuide />
           <Button variant="outline" size="sm" onClick={exportCsv}>
             <Download /> CSV
           </Button>
