@@ -47,6 +47,15 @@ export function GithubPrivacyGuide() {
           </dl>
         </section>
 
+        <section className="space-y-2 border-t border-border pt-4 text-sm" aria-labelledby="github-privacy-date">
+          <h2 id="github-privacy-date" className="font-semibold">Was das Datum neben einer Datei bedeutet</h2>
+          <p className="text-muted-foreground">Das Datum, das GitHub neben <strong>README.md</strong> anzeigt, ist der letzte Commit, der <em>diese Datei selbst</em> geändert hat – nicht der Zeitpunkt des letzten Repository-Sync. Commits, die nur andere Dateien betreffen, ändern dieses Datum nicht.</p>
+          <p className="text-muted-foreground">Den tatsächlichen Sync-Stand sehen Sie unter <strong>Commits</strong>: Dort stehen alle übertragenen Änderungen chronologisch, die neuesten oben. Ein abweichendes README-Datum ist daher kein Hinweis auf einen fehlgeschlagenen Sync.</p>
+          <Button asChild variant="outline" className="mt-2 h-auto min-h-10 whitespace-normal text-left">
+            <a href={`${repositoryUrl}/commits`} target="_blank" rel="noopener noreferrer"><ExternalLink /> Commits des Repositorys ansehen</a>
+          </Button>
+        </section>
+
         <section className="space-y-2 border-t border-border pt-4 text-sm" aria-labelledby="github-privacy-consequences">
           <h2 id="github-privacy-consequences" className="font-semibold">Wichtige Folgen und Kontrolle</h2>
           <ul className="list-disc space-y-2 pl-5 text-muted-foreground">

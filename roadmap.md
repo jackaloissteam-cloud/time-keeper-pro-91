@@ -1,5 +1,7 @@
 # Roadmap
 
+- [x] GitHub-Anleitung um den Hinweis ergänzt, dass das Datei-Datum den letzten README-Commit zeigt, nicht den letzten Repository-Sync.
+
 - [x] GitHub-Anleitung zur privaten Sichtbarkeit mit Zugriffsfolgen ergänzt; Öffnen, Lesen, Links und Schließen auf Handy/PC geprüft.
 
 - [x] PDF-Layout druckfreundlich überarbeitet: 31 Tage auf einer A4-Seite, klare Stunden-/Pausensummen und Vergütung; 44 Stunden / 609,70 € geprüft, lange Bemerkungen vollständig auf Folgeseite, Sichtprüfung ohne Überlappungen oder abgeschnittenen Text.
