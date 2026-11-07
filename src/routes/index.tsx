@@ -22,6 +22,7 @@ import {
   hasTimeSeparator,
   isCompleteTimeRange,
   isWeekend,
+  previousMonth,
   formatTimeRange,
   parseTimeRange,
   toCsv,
@@ -64,6 +65,7 @@ function Timesheet() {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [months, setMonths] = useState<MonthMap>({});
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [carryOver, setCarryOver] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [search, setSearch] = useState("");
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
@@ -117,6 +119,7 @@ function Timesheet() {
     setSettings(next);
     setMonths(map);
     setEntries(buildMonthEntries(next.month, map[next.month]?.entries ?? []));
+    setCarryOver(map[next.month]?.carryOverHours ?? 0);
     setLoaded(true);
   }, []);
 
@@ -147,7 +150,7 @@ function Timesheet() {
     if (!loaded) return;
     const all: MonthMap = {
       ...months,
-      [settings.month]: { month: settings.month, employee: settings.employee, entries },
+      [settings.month]: { month: settings.month, employee: settings.employee, entries, carryOverHours: carryOver },
     };
     const payload: Stored = {
       settings: {
@@ -163,7 +166,7 @@ function Timesheet() {
     } catch {
       /* Speicher voll oder gesperrt */
     }
-  }, [settings, entries, months, loaded]);
+  }, [settings, entries, months, carryOver, loaded]);
 
   const changeSettings = (patch: Partial<Settings>) => {
     setSettings((prev) => ({ ...prev, ...patch }));
@@ -186,7 +189,7 @@ function Timesheet() {
     if (!q) return [];
     const all: MonthMap = {
       ...months,
-      [settings.month]: { month: settings.month, employee: settings.employee, entries },
+      [settings.month]: { month: settings.month, employee: settings.employee, entries, carryOverHours: carryOver },
     };
     return Object.values(all)
       .filter((m) => hasData(m.entries) || m.employee)
@@ -208,19 +211,32 @@ function Timesheet() {
           .map((e) => `${dayLabel(e.date)}: ${e.note}`),
       }))
       .sort((a, b) => b.month.localeCompare(a.month));
-  }, [search, months, entries, settings]);
+  }, [search, months, entries, settings, carryOver]);
 
   const setMonth = (month: string) => {
     if (!month || month === settings.month) return;
     setMonths((prev) => ({
       ...prev,
-      [settings.month]: { month: settings.month, employee: settings.employee, entries },
+      [settings.month]: { month: settings.month, employee: settings.employee, entries, carryOverHours: carryOver },
     }));
     setSettings((prev) => ({ ...prev, month, employee: months[month]?.employee ?? "" }));
     setEntries(buildMonthEntries(month, months[month]?.entries ?? []));
+    setCarryOver(months[month]?.carryOverHours ?? 0);
   };
 
-  const totals = useMemo(() => calcTotals(entries, settings), [entries, settings]);
+  const totals = useMemo(() => calcTotals(entries, settings, carryOver), [entries, settings, carryOver]);
+
+  // Vormonat: Summen anzeigen und Überstunden als Übertrag übernehmen
+  const prevMonthKey = previousMonth(settings.month);
+  const prevMonthData = useMemo(() => {
+    const all: MonthMap = {
+      ...months,
+      [settings.month]: { month: settings.month, employee: settings.employee, entries, carryOverHours: carryOver },
+    };
+    const row = all[prevMonthKey];
+    if (!row || !hasData(row.entries)) return null;
+    return calcTotals(row.entries, settings, row.carryOverHours ?? 0);
+  }, [months, entries, settings, carryOver, prevMonthKey]);
   const overCap = totals.totalHours > settings.capHours;
 
   const update = (id: string, patch: Partial<Entry>) => {
@@ -245,7 +261,7 @@ function Timesheet() {
   };
 
   const exportBackup = () => {
-    const all: MonthMap = { ...months, [settings.month]: { month: settings.month, employee: settings.employee, entries } };
+    const all: MonthMap = { ...months, [settings.month]: { month: settings.month, employee: settings.employee, entries, carryOverHours: carryOver } };
     const saved = Object.fromEntries(Object.entries(all).filter(([, row]) => hasData(row.entries) || row.employee));
     if (!Object.keys(saved).length) { setBackupMessage("Keine ausgefüllten Stundenzettel zum Sichern vorhanden."); return; }
     const blob = new Blob([JSON.stringify({ format: "stundenzettel-backup", version: 1, months: saved }, null, 2)], { type: "application/json" });
@@ -264,7 +280,7 @@ function Timesheet() {
     try {
       if (file.size > 10 * 1024 * 1024) throw new Error("Die Sicherungsdatei ist zu groß (maximal 10 MB).");
       const incoming = parseBackup(await file.text());
-      const all: MonthMap = { ...months, [settings.month]: { month: settings.month, employee: settings.employee, entries } };
+      const all: MonthMap = { ...months, [settings.month]: { month: settings.month, employee: settings.employee, entries, carryOverHours: carryOver } };
       const restored = restoreMissingMonths(all, incoming);
       // Write successfully before changing UI state: full/blocked storage must not claim a successful restore.
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ settings, months: restored.months }));
@@ -273,6 +289,7 @@ function Timesheet() {
       if (current) {
         setEntries(buildMonthEntries(settings.month, current.entries));
         setSettings((previous) => ({ ...previous, employee: current.employee }));
+        setCarryOver(current.carryOverHours ?? 0);
       }
       setBackupMessage(`${restored.imported} Monate wiederhergestellt. ${restored.skipped} bereits vorhandene Monate unverändert behalten.`);
     } catch (error) {
@@ -387,6 +404,57 @@ function Timesheet() {
             onChange={(e) => changeSettings({ capHours: Number(e.target.value) })}
           />
         </Field>
+      </section>
+
+      <section aria-label="Vormonat und Übertrag" className="print-compact mt-4 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-raise)]">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Vormonat: {formatMonth(prevMonthKey)}
+            </p>
+            {prevMonthData ? (
+              <p className="mt-1 text-sm text-foreground">
+                <span className="tabular font-semibold">{formatHours(prevMonthData.totalHours)} Std.</span> gesamt
+                · <span className="tabular">{formatHours(prevMonthData.overtimeHours)} Std. Überstunden</span>
+                · <span className="tabular">{formatEuro(prevMonthData.totalPay)}</span>
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Kein ausgefüllter Stundenzettel für den Vormonat in diesem Browser gespeichert.
+              </p>
+            )}
+          </div>
+          <div className="no-print flex flex-wrap items-end gap-2">
+            <Field label="Übertrag (Std.)">
+              <Input
+                type="number"
+                step="0.25"
+                min="0"
+                inputMode="decimal"
+                value={carryOver ? String(carryOver) : ""}
+                placeholder="0"
+                aria-label="Übertrag aus dem Vormonat in Stunden"
+                onChange={(e) => setCarryOver(Math.max(0, Number(e.target.value) || 0))}
+                className="w-28"
+              />
+            </Field>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!prevMonthData}
+              onClick={() => setCarryOver(prevMonthData?.overtimeHours ?? 0)}
+            >
+              Überstunden aus Vormonat übernehmen
+            </Button>
+          </div>
+        </div>
+        {carryOver > 0 && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            Der Übertrag von {formatHours(carryOver)} Std. wird zu den Gesamtstunden dieses Monats
+            addiert und an der {formatHours(settings.capHours)}-Stunden-Grenze mitgezählt.
+          </p>
+        )}
       </section>
 
       <section aria-label="Stundenzettelsuche" className="no-print mt-4 border-b border-border py-4">
@@ -648,6 +716,11 @@ function Timesheet() {
             <tr className="border-t-2 border-primary/30 bg-secondary">
               <td colSpan={4} className="px-3 py-3 text-right text-sm font-semibold">
                 Gesamtstunden
+                {carryOver > 0 && (
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    inkl. {formatHours(carryOver)} Std. Übertrag aus {formatMonth(prevMonthKey)}
+                  </span>
+                )}
               </td>
               <td className="tabular px-3 py-3 text-right text-base font-bold">
                 {formatHours(totals.totalHours)}

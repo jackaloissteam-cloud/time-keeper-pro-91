@@ -16,6 +16,12 @@ test("restore keeps existing populated months and adds missing months", () => {
 test("empty current month can be restored", () => {
   assert.equal(restoreMissingMonths({ "2026-09": { ...september, entries: [] } }, { "2026-09": september }).imported, 1);
 });
+test("backup keeps the carry-over and rejects invalid carry-over values", () => {
+  const parsed = parseBackup(JSON.stringify({ months: { "2026-09": { ...september, carryOverHours: 5.5 } } }));
+  assert.equal(parsed["2026-09"]?.carryOverHours, 5.5);
+  assert.equal(parseBackup(JSON.stringify({ months: { "2026-09": september } }))["2026-09"]?.carryOverHours, 0);
+  assert.throws(() => parseBackup(JSON.stringify({ months: { "2026-09": { ...september, carryOverHours: -1 } } })));
+});
 test("invalid dates and times reject the entire import", () => {
   for (const patch of [{ date: "2026-09-31" }, { start: "25:00" }, { breakMinutes: -1 }]) {
     assert.throws(() => parseBackup(JSON.stringify({ months: { "2026-09": { ...september, entries: [{ ...september.entries[0], ...patch }] } } })));

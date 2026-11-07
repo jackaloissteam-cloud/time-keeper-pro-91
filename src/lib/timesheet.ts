@@ -56,9 +56,9 @@ export type Totals = {
   remainingToCap: number;
 };
 
-export function calcTotals(entries: Entry[], settings: Settings): Totals {
-  const totalHours =
-    Math.round(entries.reduce((sum, e) => sum + (entryHours(e) ?? 0), 0) * 100) / 100;
+export function calcTotals(entries: Entry[], settings: Settings, carryOverHours = 0): Totals {
+  const worked = entries.reduce((sum, e) => sum + (entryHours(e) ?? 0), 0);
+  const totalHours = Math.round((worked + carryOverHours) * 100) / 100;
   const baseHours = Math.min(totalHours, settings.capHours);
   const overtimeHours = Math.max(0, Math.round((totalHours - settings.capHours) * 100) / 100);
   const basePay = Math.round(baseHours * settings.baseRate * 100) / 100;
@@ -118,6 +118,14 @@ export function toCsv(entries: Entry[], settings: Settings, totals: Totals): str
   return rows
     .map((r) => r.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(";"))
     .join("\n");
+}
+
+/** Schlüssel des Vormonats, z. B. "2026-01" → "2025-12". */
+export function previousMonth(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  if (!y || !m) return month;
+  const d = new Date(y, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 export function daysInMonth(month: string): number {

@@ -1,6 +1,6 @@
 import { daysInMonth, type Entry } from "./timesheet";
 
-export type MonthRow = { month: string; employee: string; entries: Entry[] };
+export type MonthRow = { month: string; employee: string; entries: Entry[]; carryOverHours?: number };
 export type MonthMap = Record<string, MonthRow>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -16,6 +16,10 @@ export function parseBackup(text: string): MonthMap {
     if (!/^\d{4}-(?:0[1-9]|1[0-2])$/.test(month) || !isRecord(row) || row["month"] !== month || typeof row["employee"] !== "string" || !Array.isArray(row["entries"])) {
       throw new Error("Die Sicherung enthält ungültige Monatsdaten. Es wurde nichts importiert.");
     }
+    const carryOver = row["carryOverHours"];
+    if (carryOver !== undefined && (typeof carryOver !== "number" || !Number.isFinite(carryOver) || carryOver < 0)) {
+      throw new Error("Die Sicherung enthält einen ungültigen Übertrag. Es wurde nichts importiert.");
+    }
     const dates = new Set<string>();
     const entries: Entry[] = [];
     for (const entry of row["entries"]) {
@@ -25,7 +29,7 @@ export function parseBackup(text: string): MonthMap {
       dates.add(entry["date"]);
       entries.push({ id: entry["date"], date: entry["date"], start: entry["start"], end: entry["end"], breakMinutes: entry["breakMinutes"], note: entry["note"] });
     }
-    result[month] = { month, employee: row["employee"], entries };
+    result[month] = { month, employee: row["employee"], entries, carryOverHours: (carryOver as number | undefined) ?? 0 };
   }
   if (Object.keys(result).length === 0) throw new Error("Die Sicherung enthält keine Stundenzettel.");
   return result;
