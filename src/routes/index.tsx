@@ -335,7 +335,7 @@ function Timesheet() {
             size="sm"
             disabled={!loaded}
             aria-label={`PDF für ${formatMonth(settings.month)} herunterladen`}
-            onClick={() => downloadPdf(entries, settings, totals)}
+            onClick={() => downloadPdf(entries, settings, totals, carryOver)}
           >
             <FileText /> PDF herunterladen
           </Button>

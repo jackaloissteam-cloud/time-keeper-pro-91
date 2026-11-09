@@ -261,7 +261,7 @@ export async function downloadXlsx(entries: Entry[], settings: Settings, totals:
 }
 
 /** Druckfreundliches A4-PDF; lange Bemerkungen werden ohne Abschneiden fortgesetzt. */
-export async function downloadPdf(entries: Entry[], settings: Settings, totals: Totals) {
+export async function downloadPdf(entries: Entry[], settings: Settings, totals: Totals, carryOverHours = 0) {
   const { jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
 
@@ -348,8 +348,8 @@ export async function downloadPdf(entries: Entry[], settings: Settings, totals: 
   autoTable(doc, {
     startY: y + 3,
     body: [
-      ["Arbeitsstunden gesamt", "Basis-Stunden", "Überstunden", "Pausen gesamt"],
-      [`${formatHours(totals.totalHours)} Std.`, `${formatHours(totals.baseHours)} Std.`, `${formatHours(totals.overtimeHours)} Std.`, `${pauseMinutes} Min.`],
+      ["Arbeitsstunden gesamt", "Basis-Stunden", "Überstunden", "Pausen gesamt (manuell)"],
+      [`${formatHours(totals.totalHours)} Std.${carryOverHours ? ` (inkl. ${formatHours(carryOverHours)} Übertrag)` : ""}`, `${formatHours(totals.baseHours)} Std.`, `${formatHours(totals.overtimeHours)} Std.`, `${pauseMinutes} Min.`],
     ],
     theme: "plain",
     styles: { fontSize: 8, cellPadding: 1, textColor: muted },
@@ -389,6 +389,18 @@ export async function downloadPdf(entries: Entry[], settings: Settings, totals: 
   doc.text("Auszahlung gesamt", left, payY + 7);
   doc.setFontSize(15);
   doc.text(formatEuro(totals.totalPay), right, payY + 7, { align: "right" });
+  // Unterschriftszeilen für den ausgedruckten Monatszettel.
+  let signY = payY + 22;
+  if (signY > 272) { doc.addPage(); heading(); signY = 50; }
+  doc.setDrawColor(ink);
+  doc.setLineWidth(0.2);
+  doc.line(left, signY, left + 75, signY);
+  doc.line(right - 75, signY, right, signY);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(muted);
+  doc.text("Datum, Unterschrift Mitarbeiter", left, signY + 4);
+  doc.text("Datum, Unterschrift Vorgesetzter", right - 75, signY + 4);
   const pages = doc.getNumberOfPages();
   for (let page = 1; page <= pages; page++) {
     doc.setPage(page);
