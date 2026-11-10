@@ -855,7 +855,13 @@ function TimeRangeInput({
         type="button"
         variant="outline"
         size="icon"
-        onPointerDown={(e) => e.preventDefault()}
+        onPointerDown={(e) => {
+          // iOS löst nach verhindertem pointerdown kein click mehr aus –
+          // darum das Trennzeichen schon hier einfügen. onClick bleibt für
+          // Tastatur/Screenreader; addSeparator ist dann ein No-op.
+          e.preventDefault();
+          addSeparator();
+        }}
         onClick={addSeparator}
         title="Trennzeichen einfügen"
         aria-label={`Trennzeichen für Arbeitszeit ${dayLabel(entry.date)} einfügen`}
