@@ -185,6 +185,21 @@ export function isCompleteTimeRange(value: string): boolean {
 }
 
 /**
+ * True, wenn die Endzeit fertig getippt ist (Minuten mit . , oder : und zwei
+ * Ziffern, z. B. "9.00-12.15"). Eine bloße Stunde wie "9-12" kann noch zu
+ * "12.15" weitergetippt werden und gilt darum noch nicht als fertig.
+ */
+export function isFinalTimeRange(value: string): boolean {
+  if (!hasTimeSeparator(value)) return false;
+  const parts = value
+    .split(SEPARATOR)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length !== 2) return false;
+  return /[.,:]\d{2}$/.test(parts[1] ?? "");
+}
+
+/**
  * Liest einen Zeitraum aus Freitext: "7-15", "7:30-15", "07:00 – 15:00",
  * "700-1500", "7 bis 15". Ohne Trennzeichen (Handy-Tastatur hat oft keins)
  * wird nur geraten, wenn genau eine Lesart möglich ist: "73015" → 07:30–15:00.

@@ -834,8 +834,9 @@ function TimeRangeInput({
         onChange={(e) => {
           const value = e.target.value;
           setDraft(value);
-          // Ist das Zeitpaar vollständig, Stunden sofort anzeigen.
-          if (isCompleteTimeRange(value)) {
+          // Erst rechnen, wenn die Endzeit inkl. Minuten fertig getippt ist –
+          // sonst wird aus "…-12" vorzeitig "12:00", bevor "12.15" fertig ist.
+          if (isFinalTimeRange(value)) {
             const parsed = parseTimeRange(value);
             if (parsed) onCommit(parsed.start, parsed.end);
           }
