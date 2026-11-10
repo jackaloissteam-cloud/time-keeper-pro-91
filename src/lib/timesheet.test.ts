@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { calcTotals, defaultSettings, previousMonth, type Entry } from "./timesheet";
+import { calcTotals, defaultSettings, parseTimeRange, previousMonth, type Entry } from "./timesheet";
 
 const entry = (start: string, end: string): Entry => ({
   id: start,
@@ -39,4 +39,10 @@ test("previousMonth stays within the year", () => {
 
 test("previousMonth crosses the year boundary", () => {
   assert.equal(previousMonth("2026-01"), "2025-12");
+});
+
+test("parseTimeRange akzeptiert Punkt als Minuten-Trennzeichen", () => {
+  assert.deepEqual(parseTimeRange("9.15-15.25"), { start: "09:15", end: "15:25" });
+  assert.deepEqual(parseTimeRange("7,30-15"), { start: "07:30", end: "15:00" });
+  assert.deepEqual(parseTimeRange("9.15 – 15.25"), { start: "09:15", end: "15:25" });
 });

@@ -825,8 +825,8 @@ function TimeRangeInput({
       <Input
         ref={ref}
         value={draft}
-        inputMode="numeric"
-        placeholder="Zeit, z. B. 7-15"
+        inputMode="decimal"
+        placeholder="Zeit, z. B. 9.15-15.25"
         aria-label={`Arbeitszeit ${dayLabel(entry.date)}`}
         onChange={(e) => {
           const value = e.target.value;
