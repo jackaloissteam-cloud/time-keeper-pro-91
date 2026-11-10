@@ -784,6 +784,9 @@ function TimeRangeInput({
   const [draft, setDraft] = useState(() => formatTimeRange(entry));
   const ref = useRef<HTMLInputElement>(null);
   const separatorRef = useRef<HTMLButtonElement>(null);
+  // iOS setzt relatedTarget nicht zuverlässig: merken, ob das Verlassen des
+  // Feldes von der Trennzeichen-Taste kommt, und dann nicht verwerfen.
+  const separatorTouched = useRef(false);
 
   useEffect(() => {
     setDraft(formatTimeRange(entry));
@@ -839,7 +842,7 @@ function TimeRangeInput({
         }}
         onBlur={(e) => {
           // Beim Antippen der Trennzeichen-Taste ist die Startzeit noch unvollständig.
-          if (e.relatedTarget === separatorRef.current) return;
+          if (e.relatedTarget === separatorRef.current || separatorTouched.current) return;
           commit(e.currentTarget.value);
         }}
         onKeyDown={(e) => {
@@ -860,7 +863,12 @@ function TimeRangeInput({
           // darum das Trennzeichen schon hier einfügen. onClick bleibt für
           // Tastatur/Screenreader; addSeparator ist dann ein No-op.
           e.preventDefault();
+          separatorTouched.current = true;
           addSeparator();
+          // Sperre wieder freigeben, falls das Feld den Fokus behalten hat.
+          setTimeout(() => {
+            separatorTouched.current = false;
+          }, 500);
         }}
         onClick={addSeparator}
         title="Trennzeichen einfügen"
