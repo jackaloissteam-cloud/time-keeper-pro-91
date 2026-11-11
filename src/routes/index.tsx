@@ -21,6 +21,7 @@ import {
   formatMonth,
   hasTimeSeparator,
   isCompleteTimeRange,
+  isFinalTimeRange,
   isWeekend,
   previousMonth,
   formatTimeRange,
